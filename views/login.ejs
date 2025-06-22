@@ -5,48 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Destination Paradise</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #ffe4ec, #fff);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    .login-container {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      width: 300px;
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
-    input {
-      width: 100%;
-      padding: 0.5rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      width: 100%;
-      padding: 0.6rem;
-      background: #f06292;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #e91e63;
-    }
-    p {
-      text-align: center;
-      margin-top: 1rem;
-    }
+  body {
+  font-family: Arial, sans-serif;
+  background: url('images/home3.jpg') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.login-container {
+  background: rgba(255, 255, 255, 0.15); /* translucent white */
+  backdrop-filter: blur(10px);           /* glass effect */
+  -webkit-backdrop-filter: blur(10px);   /* Safari support */
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  width: 320px;
+  color: #fff; /* Text color light on dark background */
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #ffffff;
+}
+
+input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #333;
+}
+
+input::placeholder {
+  color: #666;
+}
+
+button {
+  width: 100%;
+  padding: 0.6rem;
+  background: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: #d81b60;
+}
+
+p {
+  text-align: center;
+  margin-top: 1rem;
+  color: #ffffff;
+}
+
+a {
+  color: #ffccf9;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
   </style>
 </head>
 <body>

@@ -6,50 +6,93 @@
   <title>Register | Destination Paradise</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #ffe4ec, #fff);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    .register-container {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      width: 300px;
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
-    input {
-      width: 100%;
-      padding: 0.5rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      width: 100%;
-      padding: 0.6rem;
-      background: #f06292;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #e91e63;
-    }
-    p {
-      text-align: center;
-      margin-top: 1rem;
-    }
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: url('images/home2.jpg') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.register-container {
+  background: rgba(255, 255, 255, 0.15);         /* Transparent white */
+  backdrop-filter: blur(12px);                  /* Blur for glass effect */
+  -webkit-backdrop-filter: blur(12px);          /* Safari support */
+  border-radius: 16px;
+  padding: 2rem;
+  width: 320px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+  padding: 0.6rem;
+  margin-bottom: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+
+}
+
+input::placeholder {
+  color: #777;
+}
+
+button {
+  width: 100%;
+  padding: 0.7rem;
+  background: #e91e63;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: #d81b60;
+}
+
+p {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+a {
+  color: #ffeef5;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3); 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
   </style>
 </head>
 <body>
+<div class="overlay">
   <div class="register-container">
     <h2>Register</h2>
     <form action="/register" method="post">
@@ -60,5 +103,6 @@
     </form>
     <p>Already have an account? <a href="/login">Login</a></p>
   </div>
+</div>
 </body>
 </html>
