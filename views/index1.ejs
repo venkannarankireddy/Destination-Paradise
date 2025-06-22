@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Destination Paradise</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="module" src="/js/firebase.js"></script>
+ <script type="module" src="/js/main.js"></script>
+
+</head>
+<body>
+
+  <!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-left">
+    <a href="/" class="brand">Destination Paradise</a>
+    <a href="#home">Home</a>
+    <div class="dropdown">
+      <a href="#" class="dropdown-toggle">Destinations</a>
+      <div class="dropdown-menu">
+        <a href="https://www.holidify.com/collections/beaches-near-hyderabad">Beach Getaway</a>
+        <a href="https://www.google.com/search?sca_esv=3865a5c24f38e491&q=travel+adventure+pics">Mountain Adventure</a>
+        <a href="https://www.google.com/search?sca_esv=3865a5c24f38e491&q=city+life">City Life Experience</a>
+        <a href="https://www.google.com/search?sca_esv=3865a5c24f38e491&q=most+travelled+places+in+india&udm=2">More</a>
+      </div>
+    </div>
+    <a href="#about">About</a>
+  </div>
+
+  <div class="nav-right">
+    <input type="text" id="search" placeholder="Search packages..." />
+
+    <!-- Added auth links -->
+    <% if (!user) { %>
+      <a href="/login" class="nav-auth-btn" style="margin-left: 10px;">Login</a>
+      <a href="/register" class="nav-auth-btn" style="margin-left: 10px;">Register</a>
+    <% } else { %>
+      <span style="margin-left: 10px;">Welcome, <%= user.email %></span>
+      <a href="/logout" class="nav-auth-btn" style="margin-left: 10px;">Logout</a>
+    <% } %>
+  </div>
+<a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
+
+
+
+</nav>
+
+  
+<section id="home">
+  <div class="carousel-main" style="position: relative; overflow: hidden;">
+    <div class="slides" id="homeSlides" style="display: flex; transition: transform 0.5s ease;">
+      <a><img src="/images/home1.jpg" class="carousel-slide" style="width: 100%; height: 80vh; object-fit: cover;" /></a>
+      <a><img src="/images/home2.jpg" class="carousel-slide" style="width: 100%; height: 80vh; object-fit: cover;" /></a>
+      <a><img src="/images/home3.jpg" class="carousel-slide" style="width: 100%; height: 80vh; object-fit: cover;" /></a>
+      <a><img src="/images/home4.jpg" class="carousel-slide" style="width: 100%; height: 80vh; object-fit: cover;" /></a>
+      <a><img src="/images/home5.jpg" class="carousel-slide" style="width: 100%; height: 80vh; object-fit: cover;" /></a>
+    </div>
+  </div>
+</section>
+
+
+
+<!-- BOOKING + TRAVEL PACKAGES SECTION -->
+<<!-- BOOKING + TRAVEL PACKAGES SECTION -->
+<section class="booking-explore-section">
+  <!-- Booking Form -->
+  <div id="bookingForm">
+    <h2>Book Your Dream Vacation</h2>
+    <form id="bookForm" action="/bookings" method="POST">
+      <label for="name">Name:</label>
+      <input type="text" id="name" name="name" required />
+
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required />
+
+      <label for="countryCode">Country Code:</label>
+      <select id="countryCode" name="countryCode" required>
+        <option value="">Select</option>
+        <option value="+91">+91</option>
+        <option value="+1">+1</option>
+        <option value="+44">+44</option>
+        <option value="+61">+61</option>
+        <option value="+81">+81</option>
+      </select>
+
+      <label for="phone">Phone Number:</label>
+      <input type="number" id="phone" name="phone" required />
+
+      <label for="birthday">Birthday:</label>
+      <input type="date" id="birthday" name="birthdate" required />
+
+      <label for="martialStatus">Marital Status:</label>
+      <select id="martialStatus" name="maritalStatus" required>
+        <option value="">Select</option>
+        <option value="single">Single</option>
+        <option value="married">Married</option>
+      </select>
+
+      <button type="submit">Submit</button>
+    </form>
+    <div id="formResponse"></div>
+  </div>
+
+  <!-- Travel Packages Carousel -->
+  <section id="explore-packages">
+  <h2>Explore Our Travel Packages</h2>
+  <div class="packages-container">
+    <div class="package-card">
+      <img src="/images/home1.jpg" alt="Beach Getaway">
+      <h3>Beach Getaway</h3>
+      <p>Enjoy a relaxing time at the sunny beaches of Bali. Inclusive of hotel stay and guided tours.</p>
+      <button class="book-btn">Book Now</button>
+    </div>
+    <div class="package-card">
+      <img src="/images/home2.jpg" alt="Mountain Adventure">
+      <h3>Mountain Adventure</h3>
+      <p>Explore the thrilling trails of the Himalayas. Package includes hiking, camping, and meals.</p>
+      <button class="book-btn">Book Now</button>
+    </div>
+    <div class="package-card">
+      <img src="/images/home3.jpg" alt="City Life Experience">
+      <h3>City Life Experience</h3>
+      <p>Discover the vibrant life of New York City. Comes with city tours and museum passes.</p>
+      <button class="book-btn">Book Now</button>
+    </div>
+  </div>
+</section>
+
+</section>
+
+
+  <!-- ABOUT SECTION -->
+  <section id="about">
+    <h2>About Us</h2>
+    <p>
+      Destination Paradise is your go-to travel planner with curated packages,
+      luxury bookings, and personal recommendations.
+    </p>
+  </section>
+  <script>
+  // HOME Carousel Logic
+  const homeSlides = document.getElementById("homeSlides");
+  const homeImages = homeSlides.querySelectorAll("a");
+  let homeIndex = 0;
+
+  function updateHomeCarousel() {
+    homeSlides.style.transform = `translateX(-${homeIndex * 100}vw)`;
+  }
+
+  homeSlides.addEventListener("click", () => {
+    homeIndex = (homeIndex + 1) % homeImages.length;
+    updateHomeCarousel();
+  });
+
+  setInterval(() => {
+    homeIndex = (homeIndex + 1) % homeImages.length;
+    updateHomeCarousel();
+  }, 5000);
+
+  // Travel Packages Carousel
+  const packageSlides = document.getElementById("packageSlides");
+  const packageImages = packageSlides.querySelectorAll("img");
+  let packageIndex = 0;
+
+  function updatePackageCarousel() {
+    packageSlides.style.transform = `translateX(-${packageIndex * 100}%)`;
+  }
+
+  packageSlides.addEventListener("click", () => {
+    packageIndex = (packageIndex + 1) % packageImages.length;
+    updatePackageCarousel();
+  });
+
+  setInterval(() => {
+    packageIndex = (packageIndex + 1) % packageImages.length;
+    updatePackageCarousel();
+  }, 5000);
+</script>
+
+</body>
+</html>

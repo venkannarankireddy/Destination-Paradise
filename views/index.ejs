@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Destination Paradise</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="module" src="/js/booking.js"></script>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <a href="/" class="brand">Destination Paradise</a>
+      <a href="#home">Home</a>
+      <div class="dropdown">
+        <a class="dropdown-toggle">Destinations</a>
+        <div class="dropdown-menu">
+          <a href="https://www.holidify.com/collections/beaches-near-hyderabad">Beach Getaway</a>
+          <a href="https://www.google.com/search?q=travel+adventure+pics">Mountain Adventure</a>
+          <a href="https://www.google.com/search?q=city+life">City Life Experience</a>
+          <a href="https://www.google.com/search?q=most+travelled+places+in+india">More</a>
+        </div>
+      </div>
+      <a href="#about">About</a>
+    </div>
+
+    <div class="nav-right">
+      <input type="text" id="search" placeholder="Search packages..." />
+      <% if (!user) { %>
+        <a href="/login" class="nav-auth-btn">Login</a>
+        <a href="/register" class="nav-auth-btn">Register</a>
+      <% } else { %>
+        <span>Welcome, <%= user.email %></span>
+        <a href="/logout" class="nav-auth-btn">Logout</a>
+      <% } %>
+      <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
+    </div>
+  </nav>
+
+  <!-- HOME CAROUSEL -->
+  <section id="home">
+    <div class="carousel-main">
+      <div class="slides" id="homeSlides">
+        <img src="/images/home2.jpg" alt="Slide 1">
+        <img src="/images/home1.jpg" alt="Slide 2">
+        <img src="/images/home3.jpg" alt="Slide 3">
+        <img src="/images/home4.jpg" alt="Slide 4">
+        <img src="/images/home5.jpg" alt="Slide 5">
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOKING + EXPLORE SECTION -->
+  <section class="booking-explore-section">
+    <!-- Booking Form -->
+    <div class="form-column">
+      <h2>Book Your Dream Vacation</h2>
+      <form id="bookForm">
+        <label for="destination">Destination</label>
+        <input type="text" id="destination" name="destination" required />
+
+        <label for="fromDate">From Date</label>
+        <input type="date" id="fromDate" name="fromDate" required />
+
+       <label for="toDate">To Date</label>
+       <input type="date" id="toDate" name="toDate" required />
+
+
+        <label for="people">Number of People</label>
+        <input type="number" id="people" name="people" min="1" max="10" required />
+
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" required />
+
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required />
+
+        <label for="countryCode">Country Code</label>
+        <select id="countryCode" name="countryCode" required>
+          <option value="" disabled selected>Select</option>
+          <option value="+1">+1 (USA)</option>
+          <option value="+44">+44 (UK)</option>
+          <option value="+91">+91 (India)</option>
+        </select>
+
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" name="phone" required />
+
+        <label for="maritalStatus">Marital Status</label>
+        <select id="maritalStatus" name="maritalStatus" required>
+          <option value="" disabled selected>Select</option>
+          <option value="single">Single</option>
+          <option value="married">Married</option>
+        </select>
+
+        <button type="submit">Book Now</button>
+        <p id="formResponse" style="margin-top: 10px;"></p>
+      </form>
+    </div>
+
+    <!-- Travel Packages -->
+    <div class="packages-column">
+      <h2>Explore Our Travel Packages</h2>
+      <div class="packages-container">
+        <div class="package-card">
+          <img src="/images/home1.jpg" alt="Beach Getaway">
+          <h3>Beach Getaway</h3>
+          <p>Relax on the beaches of Bali.</p>
+          <button class="book-btn" data-destination="Beach Getaway">Book Now</button>
+        </div>
+        <div class="package-card">
+          <img src="/images/home2.jpg" alt="Mountain Adventure">
+          <h3>Mountain Adventure</h3>
+          <p>Hike the majestic Himalayas.</p>
+          <button class="book-btn" data-destination="Mountain Adventure">Book Now</button>
+        </div>
+        <div class="package-card">
+          <img src="/images/home3.jpg" alt="City Life">
+          <h3>City Life</h3>
+          <p>Explore vibrant New York.</p>
+          <button class="book-btn" data-destination="City Life">Book Now</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT SECTION -->
+  <section id="about" class="about-section">
+    <div class="about-images">
+      <img src="/images/home1.jpg" alt="About 1">
+      <img src="/images/home2.jpg" alt="About 2">
+    </div>
+    <div class="about-content">
+      <h2>About Us</h2>
+      <p>Destination Paradise curates luxury travel packages—beach, mountain, or city—perfectly tailored for you.</p>
+      <form id="about-form">
+        <select required>
+          <option value="">Choose your dream destination</option>
+          <option value="bali">Bali</option>
+          <option value="goa">Goa</option>
+          <option value="manali">Manali</option>
+          <option value="newyork">New York</option>
+        </select>
+        <button type="submit" class="submit-btn">Submit</button>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    document.querySelectorAll('.package-card .book-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dest = btn.dataset.destination;
+        document.getElementById('destination').value = dest;
+        document.getElementById('destination').focus();
+        window.scrollTo({ top: document.getElementById('bookForm').offsetTop - 100, behavior: 'smooth' });
+      });
+    });
+
+    document.getElementById("about-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const dest = e.target.querySelector("select").value;
+      alert(`You selected: ${dest}`);
+    });
+
+    const homeSlides = document.getElementById("homeSlides");
+    let homeIndex = 0;
+    setInterval(() => {
+      homeIndex = (homeIndex + 1) % homeSlides.children.length;
+      homeSlides.style.transform = `translateX(-${homeIndex * 100}vw)`;
+    }, 5000);
+    // Set min date to tomorrow in date input
+const dateInput = document.getElementById("dates");
+if (dateInput) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  dateInput.min = tomorrow.toISOString().split("T")[0];
+}
+
+  </script>
+</body>
+</html>

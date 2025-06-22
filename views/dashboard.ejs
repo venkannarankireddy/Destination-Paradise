@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Bookings</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+      padding: 2rem;
+    }
+    h2 {
+      margin-bottom: 1rem;
+    }
+    button {
+      background: #e91e63;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 2rem;
+    }
+    button:hover {
+      background: #c2185b;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #ffe4ec;
+    }
+  </style>
+</head>
+<body>
+  <h2>Welcome, <%= user.email %></h2>
+  <button onclick="window.location.href='/logout'">Logout</button>
+
+  <h2>Your Bookings</h2>
+
+  <% if (bookings.length === 0) { %>
+    <p>No bookings yet.</p>
+  <% } else { %>
+    <table>
+  <thead>
+    <tr>
+      <th>Destination</th>
+      <th>From</th>
+      <th>To</th>
+      <th>People</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Phone</th>
+      <th>Status</th>
+      <th>Booked At</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% bookings.forEach((b) => { %>
+      <tr>
+        <td><%= b.destination %></td>
+        <td><%= b.fromDate %></td>
+        <td><%= b.toDate %></td>
+        <td><%= b.people %></td>
+        <td><%= b.name %></td>
+        <td><%= b.email %></td>
+        <td><%= b.countryCode %> <%= b.phone %></td>
+        <td><%= b.maritalStatus %></td>
+        <td><%= b.bookedAt %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+
+  <% } %>
+</body>
+</html>
