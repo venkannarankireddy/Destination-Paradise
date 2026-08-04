@@ -63,6 +63,7 @@
       <th>Phone</th>
       <th>Status</th>
       <th>Booked At</th>
+      <th>Action</th>
     </tr>
   </thead>
   <tbody>
@@ -75,8 +76,47 @@
         <td><%= b.name %></td>
         <td><%= b.email %></td>
         <td><%= b.countryCode %> <%= b.phone %></td>
-        <td><%= b.maritalStatus %></td>
+        <td>
+<% if (b.status === "Cancelled") { %>
+
+<span style="color:red;font-weight:bold;">
+❌ Cancelled
+</span>
+
+<% } else { %>
+
+<span style="color:green;font-weight:bold;">
+✅ Confirmed
+</span>
+
+<% } %>
+</td>
         <td><%= b.bookedAt %></td>
+        <td>
+  <% if (b.status !== "Cancelled") { %>
+
+<form action="/cancel-booking/<%= b.id %>" method="POST">
+
+<button
+type="submit"
+onclick="return confirm('Cancel this booking?');"
+style="background:#dc3545">
+
+Cancel Booking
+
+</button>
+
+</form>
+
+<% } else { %>
+
+<button disabled
+style="background:gray;">
+Cancelled
+</button>
+
+<% } %>
+</td>
       </tr>
     <% }) %>
   </tbody>

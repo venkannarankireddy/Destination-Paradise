@@ -108,7 +108,6 @@ app.get("/logout", (req, res) => {
   req.session.destroy();
   res.redirect("/login");
 });
-
 app.get("/dashboard", async (req, res) => {
   if (!req.session.user) return res.redirect("/login");
 
@@ -119,28 +118,46 @@ app.get("/dashboard", async (req, res) => {
       .orderBy("bookedAt", "desc")
       .get();
 
-    const bookings = snapshot.docs.map((doc) => {
+    const bookings = [];
+
+    snapshot.forEach((doc) => {
+      console.log("Firestore Document ID:", doc.id);
+
       const data = doc.data();
 
-      return {
-        ...data,
-        fromDate: data.fromDate ? new Date(data.fromDate).toLocaleDateString() : "N/A",
-        toDate: data.toDate ? new Date(data.toDate).toLocaleDateString() : "N/A",
-        bookedAt: data.bookedAt?.toDate().toLocaleString() || "N/A",
-      };
+bookings.push({
+    id: doc.id,
+    destination: data.destination,
+    fromDate: data.fromDate
+      ? new Date(data.fromDate).toLocaleDateString()
+      : "N/A",
+    toDate: data.toDate
+      ? new Date(data.toDate).toLocaleDateString()
+      : "N/A",
+    people: data.people,
+    name: data.name,
+    email: data.email,
+    countryCode: data.countryCode,
+    phone: data.phone,
+
+    status: data.status || "Confirmed",   // NEW
+
+    bookedAt: data.bookedAt
+      ? data.bookedAt.toDate().toLocaleString()
+      : "N/A",
+});
     });
+
+    console.log(bookings);
 
     res.render("dashboard", {
       bookings,
       user: req.session.user,
     });
+
   } catch (err) {
-    console.error("Error fetching bookings:", err);
-    res.render("dashboard", {
-      bookings: [],
-      user: req.session.user,
-      error: "Failed to fetch bookings.",
-    });
+    console.error(err);
+    res.send(err.message);
   }
 });
 app.post("/bookings", async (req, res) => {
@@ -187,6 +204,34 @@ app.post("/bookings", async (req, res) => {
   ) {
     return res.status(400).json({ message: "All fields are required and must be valid." });
   }
+  // Check for conflicting bookings
+const existingBookings = await db
+  .collection("bookings")
+  .where("email", "==", email)
+  .where("destination", "==", destination)
+  .where("status", "==", "Confirmed")
+  .get();
+
+let conflict = false;
+
+existingBookings.forEach((doc) => {
+  const data = doc.data();
+
+  const existingFrom = new Date(data.fromDate);
+  const existingTo = new Date(data.toDate);
+
+  // Check if date ranges overlap
+  if (from <= existingTo && to >= existingFrom) {
+    conflict = true;
+  }
+});
+
+if (conflict) {
+  return res.status(400).json({
+    message:
+      "You already have a confirmed booking for this destination during the selected dates.",
+  });
+}
 
   const booking = {
     destination,
@@ -198,11 +243,16 @@ app.post("/bookings", async (req, res) => {
     countryCode,
     phone,
     maritalStatus,
+    status: "Confirmed",
     bookedAt: new Date(),
   };
 
   try {
     const ref = await db.collection("bookings").add(booking);
+
+await ref.update({
+    bookingId: ref.id
+});
     console.log("✅ Booking saved with ID:", ref.id);
     return res.status(200).json({ message: "Booking successful!" });
   } catch (error) {
@@ -211,7 +261,35 @@ app.post("/bookings", async (req, res) => {
   }
 });
 
+app.post("/cancel-booking/:id", async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect("/login");
+  }
 
+  try {
+    const bookingRef = db.collection("bookings").doc(req.params.id);
+    const booking = await bookingRef.get();
+
+    if (!booking.exists) {
+      return res.send("Booking not found.");
+    }
+
+    // Only allow the owner to cancel
+    if (booking.data().email !== req.session.user.email) {
+      return res.status(403).send("Unauthorized.");
+    }
+
+    await bookingRef.update({
+    status: "Cancelled"
+});
+
+    res.redirect("/dashboard");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Unable to cancel booking.");
+  }
+});
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));

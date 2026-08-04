@@ -40,16 +40,24 @@
 
   <!-- HOME CAROUSEL -->
   <section id="home">
-    <div class="carousel-main">
-      <div class="slides" id="homeSlides">
-        <img src="/images/home2.jpg" alt="Slide 1">
-        <img src="/images/home1.jpg" alt="Slide 2">
-        <img src="/images/home3.jpg" alt="Slide 3">
-        <img src="/images/home4.jpg" alt="Slide 4">
-        <img src="/images/home5.jpg" alt="Slide 5">
-      </div>
+  <div class="carousel-main">
+
+    <button id="prevBtn" class="carousel-btn left">&#10094;</button>
+
+
+
+    <div class="slides" id="homeSlides">
+      <img src="/images/home2.jpg" alt="Slide 1">
+      <img src="/images/home1.jpg" alt="Slide 2">
+      <img src="/images/home3.jpg" alt="Slide 3">
+      <img src="/images/home4.jpg" alt="Slide 4">
+      <img src="/images/home5.jpg" alt="Slide 5">
     </div>
-  </section>
+
+    <button id="nextBtn" class="carousel-btn right">&#10095;</button>
+
+  </div>
+</section>
 
   <!-- BOOKING + EXPLORE SECTION -->
   <section class="booking-explore-section">
@@ -164,11 +172,52 @@
     });
 
     const homeSlides = document.getElementById("homeSlides");
-    let homeIndex = 0;
-    setInterval(() => {
-      homeIndex = (homeIndex + 1) % homeSlides.children.length;
-      homeSlides.style.transform = `translateX(-${homeIndex * 100}vw)`;
-    }, 5000);
+const slides = homeSlides.children;
+
+let homeIndex = 0;
+
+function showSlide(index) {
+    homeSlides.style.transform = `translateX(-${index * 100}%)`;
+}
+
+// Auto Slide
+let autoSlide = setInterval(nextSlide, 2000);
+
+const carousel = document.querySelector(".carousel-main");
+
+carousel.addEventListener("mouseenter", () => {
+    clearInterval(autoSlide);
+});
+
+carousel.addEventListener("mouseleave", () => {
+    autoSlide = setInterval(nextSlide, 2000);
+});
+
+function nextSlide() {
+    homeIndex = (homeIndex + 1) % slides.length;
+    showSlide(homeIndex);
+}
+
+function prevSlide() {
+    homeIndex = (homeIndex - 1 + slides.length) % slides.length;
+    showSlide(homeIndex);
+}
+
+// Next Button
+document.getElementById("nextBtn").addEventListener("click", () => {
+    nextSlide();
+
+    clearInterval(autoSlide);
+    autoSlide = setInterval(nextSlide, 2000);
+});
+
+// Previous Button
+document.getElementById("prevBtn").addEventListener("click", () => {
+    prevSlide();
+
+    clearInterval(autoSlide);
+    autoSlide = setInterval(nextSlide, 2000);
+});
     // Set min date to tomorrow in date input
 const dateInput = document.getElementById("dates");
 if (dateInput) {
