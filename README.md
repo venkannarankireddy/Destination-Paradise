@@ -75,9 +75,4 @@ http://localhost:3000
 - Admin analytics dashboard
 - Email notifications
 
-## Author
 
-**Rankireddy Venkanna Babu**
-
-- LinkedIn: https://linkedin.com/in/your-linkedin
-- GitHub: https://github.com/your-github
