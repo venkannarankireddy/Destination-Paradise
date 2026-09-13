@@ -16,9 +16,9 @@
         </p>
       </div>
 
-      <% if (unreadCount > 0) { %>
+      <% if (typeof unreadCount !== 'undefined' && unreadCount > 0) { %>
         <form action="/notifications/mark-all-read" method="POST">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
           <button type="submit" class="btn btn-outline btn-sm">
             ✓ Mark All as Read (<%= unreadCount %>)
           </button>
@@ -27,7 +27,7 @@
     </div>
 
     <!-- NOTIFICATION LIST -->
-    <% if (notifications.length === 0) { %>
+    <% if (typeof notifications === 'undefined' || !Array.isArray(notifications) || notifications.length === 0) { %>
       <div class="card" style="text-align: center; padding: 4rem 2rem;">
         <div style="font-size: 3rem; margin-bottom: 1rem;">🔔</div>
         <h3 style="font-size: 1.35rem; color: var(--primary-900); margin-bottom: 0.5rem;">No Notifications Yet</h3>

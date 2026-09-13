@@ -46,6 +46,17 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 - **Platform Monitoring:** Read-only tracking of all platform trips (`/admin/trips`) with milestone timestamps, and registered users (`/admin/users`).
 - **Audit Trails:** Automatic tracking of verification and active status update timestamps and admin UIDs.
 
+### ⚙️ Production Infrastructure & Reliability (Phase 10)
+- **Persistent Firestore Session Store:** Zero memory leaks, multi-instance cluster support, and process restart survivability via `FirestoreSessionStore` backed by `sessions/{sid}` in Firestore.
+- **Request Correlation IDs:** Automatic propagation and validation of `X-Request-ID` across reverse proxies, application middlewares, structured logs, and client error responses.
+- **Structured Logging:** Production single-line JSON logging with automatic deep redaction of sensitive credentials, secrets, and tokens, paired with HTTP request duration tracking.
+- **Operational Health Endpoints:**
+  - `GET /health`: Ultra-fast process liveness probe for container orchestrators.
+  - `GET /ready`: Application readiness probe verifying Firestore connectivity with bounded timeout, short caching (preventing probe storms), and immediate 503 response during graceful shutdown.
+- **Graceful Shutdown:** Controlled shutdown sequence handling `SIGTERM` and `SIGINT` with connection draining, timeout fallback, and idempotency guarantees.
+- **Startup Configuration Validation:** Fast fail-safe startup checks detecting missing production credentials and enforcing 32+ char session secrets.
+- **Production Deployment Guide:** Complete operational and reverse proxy configuration manual documented in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ---
 
 ## 🔒 Security & Hardening Architecture
@@ -66,6 +77,7 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 - **Backend Framework:** Express.js (v5.1.x)
 - **Templating Engine:** EJS with component partials (`head`, `navbar`, `flash`, `footer`)
 - **Database & Transactions:** Google Cloud Firestore (Firebase Admin SDK v13.x)
+- **Session Storage:** Custom FirestoreSessionStore (`sessions/{sid}`)
 - **Authentication:** Firebase Authentication (Google Identity Toolkit REST API v1)
 - **Security Middleware:** `helmet`, `csrf-csrf`, `express-rate-limit`, `cookie-parser`, `express-session`
 
@@ -76,7 +88,15 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 ```
 Destination-Paradise/
 ├── docs/
-│   └── ARCHITECTURE.md          # Complete architecture, schemas, and permission matrix
+│   ├── ARCHITECTURE.md          # Complete architecture, schemas, and permission matrix
+│   └── DEPLOYMENT.md            # Production deployment, Nginx proxy, and ops runbook
+├── lib/
+│   ├── config.js                # Startup environment & production configuration validator
+│   ├── logger.js                # Structured JSON logger with sensitive data redaction
+│   ├── request-id.js            # X-Request-ID correlation middleware
+│   ├── session-store.js         # Persistent Firestore-backed express-session store
+│   ├── health.js                # Liveness (/health) and cached readiness (/ready) router
+│   └── shutdown.js              # Graceful shutdown coordinator for SIGTERM / SIGINT
 ├── public/
 │   ├── css/
 │   │   └── style.css            # Complete design system & responsive layout tokens
@@ -109,7 +129,7 @@ Destination-Paradise/
 │   └── admin-users.ejs          # Platform user registry & role directory
 ├── scripts/
 │   └── make-admin.js            # CLI tool to promote users to administrator
-├── scratch/                     # Automated test suites (Phases 5, 6, 8, 9)
+├── scratch/                     # Automated test suites (Phases 5, 6, 8, 9, 10)
 ├── firestore.indexes.json       # Firestore composite index definitions
 ├── app.js                       # Express application server
 ├── package.json                 # Node.js dependencies & scripts
@@ -138,7 +158,7 @@ Create a `.env` file in the project root based on `.env.example`:
 PORT=3000
 NODE_ENV=development
 FIREBASE_API_KEY=your_firebase_web_api_key
-SESSION_SECRET=your_long_random_session_secret
+SESSION_SECRET=your_long_random_session_secret_at_least_32_chars
 APP_TIMEZONE=Asia/Colombo
 ```
 Ensure your Firebase Admin service account JSON key is placed at `./key.json` or configured via `GOOGLE_APPLICATION_CREDENTIALS`.
@@ -164,17 +184,20 @@ Access the application at `http://localhost:3000`.
 Execute the automated test suites against the running Express application and Firestore:
 
 ```bash
+# Phase 10 Production Infrastructure & Reliability Suite
+node scratch/test-phase10.js
+
+# Phase 9 Trip Lifecycle & Notification Suite (51 tests)
+node scratch/test-phase9.js
+
+# Phase 8 Admin Portal & Driver Verification Suite (39 tests)
+node scratch/test-phase8.js
+
 # Phase 6 Security & Hardening Suite (48 tests)
 node scratch/test-phase6.js
 
 # Phase 5 Marketplace & Overlap Regression Suite (29 tests)
 node scratch/test-phase5-regression.js
-
-# Phase 8 Admin Portal & Driver Verification Suite (39 tests)
-node scratch/test-phase8.js
-
-# Phase 9 Trip Lifecycle & Notification Suite
-node scratch/test-phase9.js
 ```
 
 ---

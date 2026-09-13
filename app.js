@@ -13,21 +13,18 @@ const { doubleCsrf } = require("csrf-csrf");
 const path = require("path");
 const fs = require("fs");
 
-// Validate critical environment variables
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
-if (!FIREBASE_API_KEY) {
-  console.warn("⚠️ WARNING: FIREBASE_API_KEY is not defined in .env. Authentication requests will fail.");
-}
+const { validateConfig } = require("./lib/config");
+const { logger, requestLogger } = require("./lib/logger");
+const { requestIdMiddleware } = require("./lib/request-id");
+const { FirestoreSessionStore } = require("./lib/session-store");
+const { shutdownCoordinator } = require("./lib/shutdown");
+const { createHealthRouter } = require("./lib/health");
 
+// Validate startup configuration (fails fast in production on fatal misconfigurations)
+validateConfig(process.env, true);
+
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret) {
-  if (process.env.NODE_ENV === "production") {
-    console.error("❌ FATAL: SESSION_SECRET is required in production environment.");
-    process.exit(1);
-  } else {
-    console.warn("⚠️ WARNING: SESSION_SECRET is not set in .env. Using fallback development secret.");
-  }
-}
 
 // Initialize Firebase Admin SDK safely
 let credential;
@@ -43,13 +40,13 @@ try {
   } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     credential = admin.credential.applicationDefault();
   } else {
-    console.error("❌ FATAL: No Firebase Admin credentials found. Provide key.json locally or set FIREBASE_SERVICE_ACCOUNT_KEY / GOOGLE_APPLICATION_CREDENTIALS.");
+    logger.error("No Firebase Admin credentials found. Provide key.json locally or set FIREBASE_SERVICE_ACCOUNT_KEY / GOOGLE_APPLICATION_CREDENTIALS.");
     process.exit(1);
   }
 
   admin.initializeApp({ credential });
 } catch (err) {
-  console.error("❌ FATAL: Failed to initialize Firebase Admin SDK:", err.message);
+  logger.error("Failed to initialize Firebase Admin SDK", { error: err.message });
   process.exit(1);
 }
 
@@ -58,12 +55,26 @@ let db;
 try {
   db = admin.firestore();
 } catch (err) {
-  console.error("❌ FATAL: Failed to initialize Firestore:", err.message);
+  logger.error("Failed to initialize Firestore", { error: err.message });
   process.exit(1);
 }
 
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
+
+// ==========================================
+// OPERATIONAL INFRASTRUCTURE MIDDLEWARE
+// ==========================================
+// 1. Request correlation ID (must run first so all subsequent logs and middlewares have req.id)
+app.use(requestIdMiddleware);
+
+// 2. Structured request logging
+app.use(requestLogger);
+
+// 3. Operational Health & Readiness Endpoints (bypass auth, CSRF, and rate limiting)
+const { healthHandler, readyHandler } = createHealthRouter(db);
+app.get("/health", healthHandler);
+app.get("/ready", readyHandler);
 
 // ==========================================
 // SECURITY HEADERS (HELMET)
@@ -97,10 +108,15 @@ app.use(cookieParser(sessionSecret || "dev-fallback-secret-destination-paradise"
 // ==========================================
 // SESSION HARDENING
 // ==========================================
-// Note: MemoryStore is used for development/single-process deployment.
-// For multi-instance production environments, replace with Redis or a persistent store.
+// PERSISTENT SESSION STORE (FIRESTORE)
+// ==========================================
+// Uses Firestore-backed session storage in the 'sessions' collection.
+// Survives process restarts and scales across multiple application instances.
+const sessionStore = new FirestoreSessionStore({ db });
+
 app.use(
   session({
+    store: sessionStore,
     secret: sessionSecret || "dev-fallback-secret-destination-paradise",
     name: "dp.sid",
     resave: false,
@@ -2474,6 +2490,7 @@ app.get("/notifications", requireAuth, async (req, res) => {
     const snap = await db
       .collection("notifications")
       .where("userId", "==", userUid)
+      .limit(100)
       .get();
 
     const notifications = [];
@@ -2606,27 +2623,67 @@ app.post("/notifications/mark-all-read", requireAuth, actionLimiter, async (req,
 // ==========================================
 
 app.use((err, req, res, next) => {
+  const reqId = req.id || res.locals.requestId;
+
   if (err.code === "EBADCSRFTOKEN") {
-    console.warn(`⚠️ CSRF token validation failed: [${req.method}] ${req.originalUrl} from ${req.ip}`);
+    logger.warn(`CSRF token validation failed: [${req.method}] ${req.originalUrl}`, {
+      requestId: reqId,
+      method: req.method,
+      url: req.originalUrl,
+      ip: req.ip,
+    });
     if (req.headers.accept && req.headers.accept.includes("application/json")) {
       return res.status(403).json({
         error: "EBADCSRFTOKEN",
         message: "Invalid or missing CSRF token. Please refresh the page and try again.",
+        requestId: reqId,
       });
     }
     return res.status(403).send("Forbidden: Invalid or expired CSRF token. Please reload the page and try again.");
   }
 
-  console.error("❌ Unhandled server error:", err);
+  logger.error("Unhandled server error", {
+    requestId: reqId,
+    error: err.message,
+    code: err.code,
+    stack: isProd ? undefined : err.stack,
+  });
+
   if (res.headersSent) {
     return next(err);
   }
+
   if (req.headers.accept && req.headers.accept.includes("application/json")) {
-    return res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected server error occurred." });
+    return res.status(500).json({
+      error: "INTERNAL_ERROR",
+      message: "An unexpected server error occurred.",
+      requestId: reqId,
+    });
   }
-  res.status(500).send("Something went wrong on our end. Please try again later.");
+
+  res.status(500).send(
+    isProd
+      ? "Something went wrong on our end. Please try again later."
+      : `Server Error: ${err.message}`
+  );
 });
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+const server = app.listen(PORT, () => {
+  logger.info(`Server running on http://localhost:${PORT}`, {
+    port: PORT,
+    env: process.env.NODE_ENV || "development",
+  });
+});
+
+// Attach server to graceful shutdown coordinator
+shutdownCoordinator.setServer(server);
+shutdownCoordinator.registerSignalHandlers();
+
+module.exports = {
+  app,
+  server,
+  shutdownCoordinator,
+  sessionStore,
+};
