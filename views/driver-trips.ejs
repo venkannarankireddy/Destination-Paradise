@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trip Requests Marketplace | Destination Paradise</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #f7f9fc;
+      color: #333;
+      min-height: 100vh;
+    }
+    /* NAVBAR */
+    .driver-nav {
+      background-color: #1e293b;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .driver-nav .brand {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f06292;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .driver-nav .brand span {
+      background: #e91e63;
+      color: white;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: #e2e8f0;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: #f06292;
+    }
+    .logout-btn {
+      background: #dc2626;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    /* CONTAINER */
+    .container {
+      max-width: 1100px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .page-header {
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .page-header h1 {
+      font-size: 1.8rem;
+      color: #0f172a;
+    }
+    .page-header p {
+      color: #64748b;
+      font-size: 0.95rem;
+      margin-top: 4px;
+    }
+
+    /* IMPORTANT NOTICE BANNER */
+    .banner-notice {
+      background: #eff6ff;
+      border-left: 5px solid #3b82f6;
+      padding: 1.2rem 1.5rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .banner-notice h3 {
+      color: #1e40af;
+      font-size: 1rem;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .banner-notice p {
+      color: #3b82f6;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .banner-inactive {
+      background: #fef2f2;
+      border-left: 5px solid #ef4444;
+      padding: 1.2rem 1.5rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      color: #991b1b;
+    }
+
+    /* FILTER BAR */
+    .filter-card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 2rem;
+    }
+    .filter-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto;
+      gap: 1rem;
+      align-items: flex-end;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 0.35rem;
+    }
+    .form-group input {
+      padding: 0.65rem 0.8rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: #f8fafc;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #e91e63;
+      background: white;
+    }
+    .btn-filter {
+      background: #1e293b;
+      color: white;
+      padding: 0.7rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      height: 40px;
+    }
+    .btn-filter:hover {
+      background: #0f172a;
+    }
+    .btn-clear {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 0.7rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 0.9rem;
+      display: inline-block;
+      text-align: center;
+      height: 40px;
+      line-height: 20px;
+    }
+    .btn-clear:hover {
+      background: #e2e8f0;
+    }
+
+    /* TRIPS GRID */
+    .trips-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .trip-card {
+      background: white;
+      border-radius: 14px;
+      padding: 1.6rem;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+      border: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .trip-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      border-color: #fbcfe8;
+    }
+    .trip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .trip-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .badge-requested {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .trip-dates {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .trip-passengers {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tourist-box {
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.2rem;
+      border-left: 3px solid #e91e63;
+    }
+    .tourist-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .tourist-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .tourist-phone {
+      font-size: 0.92rem;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ACTION BUTTONS */
+    .contact-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+    .btn-call {
+      flex: 1;
+      background: #0284c7;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-call:hover {
+      background: #0369a1;
+    }
+    .btn-whatsapp {
+      flex: 1;
+      background: #16a34a;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-whatsapp:hover {
+      background: #15803d;
+    }
+
+    .read-only-pill {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 0.76rem;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    /* EMPTY STATE */
+    .empty-card {
+      background: white;
+      border-radius: 14px;
+      padding: 3.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+      color: #64748b;
+    }
+    .empty-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav class="driver-nav">
+  <a href="/driver/dashboard" class="brand">
+    Destination Paradise <span>DRIVER</span>
+  </a>
+  <div class="nav-links">
+    <a href="/driver/dashboard">Dashboard</a>
+    <a href="/driver/profile">Van Profile</a>
+    <a href="/driver/availability">Availability</a>
+    <a href="/driver/trips" class="active">Trip Requests</a>
+    <a href="/driver/my-trips">My Trips</a>
+    <a href="/logout" class="logout-btn">Logout</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Trip Requests Marketplace</h1>
+      <p>Discover tourist long-distance trip requests matching your van capacity and availability schedule.</p>
+    </div>
+    <a href="/driver/dashboard" style="color: #64748b; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+  </div>
+
+  <!-- BUSINESS MODEL CONTACT NOTICE -->
+  <div class="banner-notice">
+    <h3>📢 Direct Tourist Communication Platform</h3>
+    <p>Contact the tourist directly to discuss pricing, luggage space, and trip details. <strong>Destination Paradise does not process payments.</strong> Once you and the tourist agree on terms, trip acceptance will be confirmed.</p>
+  </div>
+
+  <% if (!driver.isActive) { %>
+    <div class="banner-inactive">
+      <strong>⚠️ You are currently Inactive / Paused.</strong>
+      <p style="margin-top: 4px;">You must set your status to Active on your dashboard to see matching trip requests.</p>
+    </div>
+  <% } %>
+
+  <!-- FILTERS -->
+  <div class="filter-card">
+    <form action="/driver/trips" method="GET" class="filter-form">
+      <div class="form-group">
+        <label for="destination">Destination</label>
+        <input type="text" id="destination" name="destination" placeholder="e.g. Bali, Manali..." value="<%= filters.destination || '' %>" />
+      </div>
+
+      <div class="form-group">
+        <label for="fromDate">From Date</label>
+        <input type="date" id="fromDate" name="fromDate" value="<%= filters.fromDate || '' %>" />
+      </div>
+
+      <div class="form-group">
+        <label for="toDate">To Date</label>
+        <input type="date" id="toDate" name="toDate" value="<%= filters.toDate || '' %>" />
+      </div>
+
+      <div class="form-group">
+        <label for="people">Max Passengers</label>
+        <input type="number" id="people" name="people" min="1" max="<%= driver.seatingCapacity %>" placeholder="Up to <%= driver.seatingCapacity %>" value="<%= filters.people || '' %>" />
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button type="submit" class="btn-filter">Filter</button>
+        <a href="/driver/trips" class="btn-clear">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- MATCHING TRIPS LIST -->
+  <% if (trips.length === 0) { %>
+    <div class="empty-card">
+      <div class="empty-icon">🚐</div>
+      <h3 style="font-size: 1.3rem; color: #0f172a; margin-bottom: 6px;">No Matching Trip Requests</h3>
+      <p style="max-width: 500px; margin: 0 auto 1.5rem auto;">
+        <% if (!driver.isActive) { %>
+          Your driver account is paused. Turn on active status to view trip requests.
+        <% } else { %>
+          There are currently no open trip requests that fit within your scheduled availability dates and van capacity (<%= driver.seatingCapacity %> seats).
+        <% } %>
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <a href="/driver/availability" style="background: #e91e63; color: white; padding: 8px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">+ Update Availability Dates</a>
+        <% if (!driver.isActive) { %>
+          <form action="/driver/toggle-active" method="POST" style="display:inline;">
+            <button type="submit" style="background: #10b981; color: white; padding: 8px 18px; border-radius: 8px; border:none; font-weight: 600; cursor: pointer;">Activate Driver Status</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  <% } else { %>
+    <div style="margin-bottom: 1rem; font-weight: 600; color: #64748b;">
+      Showing <%= trips.length %> matching trip request<%= trips.length === 1 ? '' : 's' %> for your <%= driver.vanModel %> (<%= driver.seatingCapacity %> seats)
+    </div>
+
+    <div class="trips-grid">
+      <% trips.forEach((trip) => { %>
+        <% 
+          // Normalize phone for WhatsApp link
+          const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
+          const waDigits = cleanPhone.replace(/[^0-9]/g, '');
+        %>
+        <div class="trip-card">
+          <div>
+            <div class="trip-header">
+              <div class="trip-title">🌴 <%= trip.destination %></div>
+              <span class="badge-requested">🟡 Looking for Driver</span>
+            </div>
+
+            <div class="trip-dates">
+              <span>📅</span> <%= trip.fromDate %> &rarr; <%= trip.toDate %>
+            </div>
+
+            <div class="trip-passengers">
+              <span>👥</span> <strong><%= trip.people %></strong> Passenger<%= trip.people === 1 ? '' : 's' %> (Fits in <%= driver.seatingCapacity %>-seat van)
+            </div>
+
+            <div class="tourist-box">
+              <div class="tourist-label">Tourist Contact</div>
+              <div class="tourist-name"><%= trip.name %></div>
+              <div class="tourist-phone">
+                <span>📞</span> <%= trip.countryCode %> <%= trip.phone %>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="contact-actions">
+              <a href="tel:<%= trip.countryCode %><%= trip.phone %>" class="btn-call">
+                📞 Call Tourist
+              </a>
+              <% if (waDigits) { %>
+                <a href="https://wa.me/<%= waDigits %>?text=Hello%20<%= encodeURIComponent(trip.name) %>,%20I%20am%20a%20van%20driver%20on%20Destination%20Paradise%20interested%20in%20your%20trip%20to%20<%= encodeURIComponent(trip.destination) %>." target="_blank" class="btn-whatsapp">
+                  💬 WhatsApp
+                </a>
+              <% } %>
+            </div>
+            <div class="read-only-pill">
+              Direct Contact Mode &bull; Acceptance will be enabled in Phase 5
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+</body>
+</html>
+

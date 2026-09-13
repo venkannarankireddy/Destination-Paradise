@@ -256,7 +256,9 @@ app.get("/dashboard", requireTourist, async (req, res) => {
         email: data.email,
         countryCode: data.countryCode,
         phone: data.phone,
-        status: data.status || "Confirmed",
+        status: data.status || "Requested",
+        driverId: data.driverId || null,
+        driverName: data.driverName || null,
         bookedAt: data.bookedAt
           ? (typeof data.bookedAt.toDate === "function" ? data.bookedAt.toDate().toLocaleString() : new Date(data.bookedAt).toLocaleString())
           : "N/A",
@@ -324,18 +326,19 @@ app.post("/bookings", async (req, res) => {
   }
 
   try {
-    // Check for conflicting bookings
+    // Check for conflicting active bookings (Requested or Confirmed)
     const existingBookings = await db
       .collection("bookings")
       .where("email", "==", email)
       .where("destination", "==", destination)
-      .where("status", "==", "Confirmed")
       .get();
 
     let conflict = false;
 
     existingBookings.forEach((doc) => {
       const data = doc.data();
+      if (data.status === "Cancelled") return; // Cancelled does not conflict
+
       const existingFrom = new Date(data.fromDate);
       const existingTo = new Date(data.toDate);
 
@@ -347,29 +350,33 @@ app.post("/bookings", async (req, res) => {
 
     if (conflict) {
       return res.status(400).json({
-        message: "You already have a confirmed booking for this destination during the selected dates.",
+        message: "You already have an active booking request for this destination during the selected dates.",
       });
     }
 
     const bookingRef = db.collection("bookings").doc();
+    const now = new Date();
     const booking = {
       bookingId: bookingRef.id,
-      destination,
+      touristId: user.uid, // strictly server-authenticated session UID
+      destination: destination.trim(),
       fromDate,
       toDate,
       people,
-      name,
-      email,
-      countryCode,
-      phone,
-      maritalStatus,
-      status: "Confirmed",
-      bookedAt: new Date(),
+      name: name.trim(),
+      email, // strictly from session
+      countryCode: countryCode.trim(),
+      phone: phone.trim(),
+      maritalStatus: maritalStatus.trim(),
+      status: "Requested", // Core Phase 4 business model: Requested
+      driverId: null,
+      bookedAt: now,
+      updatedAt: now,
     };
 
     await bookingRef.set(booking);
-    console.log("✅ Booking saved with ID:", bookingRef.id);
-    return res.status(200).json({ message: "Booking successful!" });
+    console.log("✅ Trip request saved with ID:", bookingRef.id);
+    return res.status(200).json({ message: "Trip request submitted! Available van drivers will review your trip." });
   } catch (error) {
     console.error("❌ Firestore error:", error.message);
     return res.status(500).json({ message: "Failed to save booking." });
@@ -611,6 +618,25 @@ const checkAvailabilityOverlap = async (dbInstance, driverUid, newFrom, newTo, e
   return { overlap: false };
 };
 
+// Driver matching logic for Phase 4 Marketplace:
+// 1. Trip status == "Requested"
+// 2. Driver isActive == true
+// 3. Driver van seatingCapacity >= trip.people
+// 4. Driver has an availability period with period.status == "available" AND
+//    trip.fromDate >= period.fromDate AND trip.toDate <= period.toDate
+const isTripMatchForDriver = (trip, driver, driverAvailability) => {
+  if (trip.status !== "Requested") return false;
+  if (!driver.isActive) return false;
+  if (Number(driver.seatingCapacity) < Number(trip.people)) return false;
+
+  const covered = driverAvailability.some((period) => {
+    if (period.status !== "available") return false;
+    return trip.fromDate >= period.fromDate && trip.toDate <= period.toDate;
+  });
+
+  return covered;
+};
+
 app.get("/driver/dashboard", requireDriver, async (req, res) => {
   try {
     const driverDoc = await db.collection("drivers").doc(req.session.user.uid).get();
@@ -638,10 +664,25 @@ app.get("/driver/dashboard", requireDriver, async (req, res) => {
 
     const upcomingAvailabilities = availabilities.filter((p) => p.toDate >= todayStr);
 
+    // Count matching trip requests for this driver
+    const requestedTripsSnap = await db
+      .collection("bookings")
+      .where("status", "==", "Requested")
+      .get();
+
+    let matchingTripsCount = 0;
+    requestedTripsSnap.forEach((doc) => {
+      const trip = doc.data();
+      if (isTripMatchForDriver(trip, driverDoc.data(), availabilities)) {
+        matchingTripsCount++;
+      }
+    });
+
     res.render("driver-dashboard", {
       driver: driverDoc.data(),
       availabilities: upcomingAvailabilities,
       totalAvailabilities: availabilities.length,
+      matchingTripsCount,
       user: req.session.user,
     });
   } catch (err) {
@@ -945,16 +986,77 @@ app.post("/driver/availability/:id/toggle", requireDriver, async (req, res) => {
   }
 });
 
-// Placeholder routes for remaining navigation links
-app.get("/driver/trips", requireDriver, (req, res) => {
-  res.render("driver-placeholder", {
-    title: "Trip Requests Marketplace",
-    phase: "Phase 4: Trip Matching",
-    icon: "📍",
-    description: "Discover tourist long-distance trip requests, view passenger details, and contact tourists directly. This module will be activated in Phase 4.",
-    activeTab: "trips",
-    user: req.session.user,
-  });
+// ==========================================
+// DRIVER TRIP REQUESTS MARKETPLACE
+// ==========================================
+
+app.get("/driver/trips", requireDriver, async (req, res) => {
+  try {
+    const driverDoc = await db.collection("drivers").doc(req.session.user.uid).get();
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+    const driver = driverDoc.data();
+
+    // Fetch driver availability windows
+    const availSnapshot = await db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .get();
+
+    const availability = availSnapshot.docs.map((doc) => doc.data());
+
+    // Fetch all Requested bookings
+    const tripsSnapshot = await db
+      .collection("bookings")
+      .where("status", "==", "Requested")
+      .get();
+
+    const allRequested = [];
+    tripsSnapshot.forEach((doc) => {
+      allRequested.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    // Sort by bookedAt desc
+    allRequested.sort((a, b) => {
+      const timeA = a.bookedAt ? (typeof a.bookedAt.toDate === "function" ? a.bookedAt.toDate().getTime() : new Date(a.bookedAt).getTime()) : 0;
+      const timeB = b.bookedAt ? (typeof b.bookedAt.toDate === "function" ? b.bookedAt.toDate().getTime() : new Date(b.bookedAt).getTime()) : 0;
+      return timeB - timeA;
+    });
+
+    // Match trips against driver constraints
+    const matchingTrips = [];
+    const destFilter = (req.query.destination || "").trim().toLowerCase();
+    const fromFilter = (req.query.fromDate || "").trim();
+    const toFilter = (req.query.toDate || "").trim();
+    const peopleFilter = parseInt(req.query.people, 10);
+
+    allRequested.forEach((trip) => {
+      if (isTripMatchForDriver(trip, driver, availability)) {
+        // Query filters
+        if (destFilter && !trip.destination.toLowerCase().includes(destFilter)) return;
+        if (fromFilter && trip.fromDate < fromFilter) return;
+        if (toFilter && trip.toDate > toFilter) return;
+        if (!isNaN(peopleFilter) && peopleFilter > 0 && trip.people > peopleFilter) return;
+
+        matchingTrips.push(trip);
+      }
+    });
+
+    res.render("driver-trips", {
+      driver,
+      trips: matchingTrips,
+      filters: req.query,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Driver trips marketplace error:", err.message);
+    res.status(500).send("Unable to load trip requests marketplace.");
+  }
 });
 
 app.get("/driver/my-trips", requireDriver, (req, res) => {

@@ -309,6 +309,16 @@
       <div style="font-size: 2rem;">📅</div>
     </div>
 
+    <!-- PENDING TRIP REQUESTS STAT -->
+    <div class="status-card" style="border-left-color: #f59e0b;">
+      <div>
+        <div class="label">Matching Trip Requests</div>
+        <div class="value"><%= typeof matchingTripsCount !== 'undefined' ? matchingTripsCount : 0 %> Available</div>
+        <a href="/driver/trips" style="font-size: 0.78rem; color: #d97706; text-decoration: none; font-weight: 700;">Browse Marketplace &rarr;</a>
+      </div>
+      <div style="font-size: 2rem;">📍</div>
+    </div>
+
     <!-- VERIFICATION STATUS -->
     <div class="status-card pending-card">
       <div>
