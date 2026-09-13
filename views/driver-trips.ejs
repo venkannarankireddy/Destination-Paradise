@@ -484,6 +484,7 @@
         <a href="/driver/availability" style="background: #e91e63; color: white; padding: 8px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">+ Update Availability Dates</a>
         <% if (!driver.isActive) { %>
           <form action="/driver/toggle-active" method="POST" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" style="background: #10b981; color: white; padding: 8px 18px; border-radius: 8px; border:none; font-weight: 600; cursor: pointer;">Activate Driver Status</button>
           </form>
         <% } %>
@@ -542,6 +543,7 @@
             </div>
 
             <form action="/driver/trips/<%= trip.id %>/accept" method="POST" onsubmit="return confirm('Have you contacted the tourist and agreed on the trip details and payment terms? Do you want to accept this trip?');" style="margin-top: 8px;">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button type="submit" class="btn-accept">
                 🤝 Accept Trip
               </button>

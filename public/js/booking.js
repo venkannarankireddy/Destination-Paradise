@@ -50,7 +50,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // Extract CSRF token from form or meta
+    const csrfToken = document.getElementById("csrfToken")?.value || "";
+
     const data = {
+      _csrf: csrfToken,
       destination,
       fromDate,
       toDate,
@@ -63,21 +67,33 @@ document.addEventListener("DOMContentLoaded", () => {
       bookedAt: new Date().toISOString()
     };
 
+    const submitBtn = form.querySelector("button[type='submit']");
+    const originalBtnText = submitBtn ? submitBtn.textContent : "Book Now";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "⏳ Submitting Request...";
+    }
+
     // UI feedback
     resDiv.textContent = "⏳ Booking in progress...";
     resDiv.style.color = "#333";
 
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
+      }
+
       const response = await fetch("/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(data)
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        resDiv.textContent = "✅ Booking successful!";
+        resDiv.textContent = "✅ " + (result.message || "Booking successful!");
         resDiv.style.color = "green";
         form.reset();
       } else {
@@ -88,6 +104,11 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error during booking:", error);
       resDiv.textContent = "❌ Network error. Please try again.";
       resDiv.style.color = "red";
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+      }
     }
   });
 });

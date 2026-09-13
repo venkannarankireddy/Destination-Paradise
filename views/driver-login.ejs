@@ -109,6 +109,7 @@
     <p class="subtext">Sign in to manage your van and view trip requests.</p>
     
     <form action="/driver/login" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="email" id="email" name="email" placeholder="Driver Email" required />
       <input type="password" id="password" name="password" placeholder="Password" required />
       <button type="submit">Sign In as Driver</button>

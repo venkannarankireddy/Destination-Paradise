@@ -287,6 +287,7 @@
             <span class="badge badge-pending" style="background:#f1f5f9; color:#64748b;">● Inactive</span>
           <% } %>
           <form action="/driver/toggle-active" method="POST" style="display: inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" style="background: none; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #475569;">
               <%= driver.isActive ? 'Pause' : 'Activate' %>
             </button>

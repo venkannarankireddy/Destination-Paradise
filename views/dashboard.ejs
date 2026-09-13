@@ -54,6 +54,7 @@
   <% if (bookings.length === 0) { %>
     <p>No bookings yet.</p>
   <% } else { %>
+    <div style="overflow-x: auto; width: 100%; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.08);">
     <table>
   <thead>
     <tr>
@@ -101,20 +102,11 @@
         </td>
         <td>
           <% if (b.status === "Accepted" && b.driverName) { %>
-            <div style="font-size: 0.88rem; line-height: 1.45;">
-              <div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">Driver: <%= b.driverName %></div>
-              <div style="color: #334155;">
-                Phone: <a href="tel:<%= b.driverPhone %>" style="color: #0284c7; text-decoration: none; font-weight: 600;"><%= b.driverPhone %></a>
-              </div>
-              <div style="color: #475569;">
-                Van: <%= b.vanModel %>
-              </div>
-              <div style="color: #475569;">
-                Vehicle: <%= b.vanNumber %>
-              </div>
-              <div style="color: #475569;">
-                Capacity: <%= b.seatingCapacity %> seats
-              </div>
+            <div style="font-size: 0.88rem; line-height: 1.4;">
+              <strong style="color: #1e293b;"><%= b.driverName %></strong><br/>
+              <span style="color: #475569;">&#128222; <a href="tel:<%= b.driverPhone %>" style="color: #0284c7; text-decoration: none; font-weight: 600;"><%= b.driverPhone %></a></span><br/>
+              <span style="color: #64748b;">&#128656; <%= b.vanModel %> (<%= b.vanNumber %>)</span><br/>
+              <span style="color: #94a3b8; font-size: 0.8rem;">Seats: <%= b.seatingCapacity %></span>
             </div>
           <% } else if (b.status === "Requested") { %>
             <span style="color: #64748b; font-style: italic;">Not assigned yet</span>
@@ -135,6 +127,7 @@
         <td>
           <% if (b.status !== "Cancelled") { %>
             <form action="/cancel-booking/<%= b.id %>" method="POST">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button
                 type="submit"
                 onclick="return confirm('Cancel this trip request?');"
@@ -152,6 +145,7 @@
     <% }) %>
   </tbody>
 </table>
+</div>
 
   <% } %>
 </body>

@@ -6,6 +6,10 @@ const express = require("express");
 const admin = require("firebase-admin");
 const bodyParser = require("body-parser");
 const session = require("express-session");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const { doubleCsrf } = require("csrf-csrf");
 const path = require("path");
 const fs = require("fs");
 
@@ -59,30 +63,135 @@ try {
 }
 
 const app = express();
+const isProd = process.env.NODE_ENV === "production";
 
-// Session setup
+// ==========================================
+// SECURITY HEADERS (HELMET)
+// ==========================================
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: [
+          "'self'",
+          "https://identitytoolkit.googleapis.com",
+          "https://*.firebaseio.com",
+          "https://*.googleapis.com",
+        ],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// Body and Cookie Parsers
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cookieParser(sessionSecret || "dev-fallback-secret-destination-paradise"));
+
+// ==========================================
+// SESSION HARDENING
+// ==========================================
+// Note: MemoryStore is used for development/single-process deployment.
+// For multi-instance production environments, replace with Redis or a persistent store.
 app.use(
   session({
     secret: sessionSecret || "dev-fallback-secret-destination-paradise",
+    name: "dp.sid",
     resave: false,
     saveUninitialized: true,
+    cookie: {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
   })
 );
 
 // EJS view engine setup
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-
-// Middleware
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Make user available in all views
+// ==========================================
+// RATE LIMITING
+// ==========================================
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.AUTH_RATE_LIMIT, 10) || 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.warn(`⚠️ Auth rate limit reached for IP: ${req.ip}`);
+    if (req.headers.accept && req.headers.accept.includes("application/json")) {
+      return res.status(429).json({
+        error: "TOO_MANY_REQUESTS",
+        message: "Too many authentication attempts. Please try again in 15 minutes.",
+      });
+    }
+    res.status(429).send("Too many authentication attempts. Please try again in 15 minutes.");
+  },
+});
+
+const actionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.ACTION_RATE_LIMIT, 10) || 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.warn(`⚠️ Action rate limit reached for IP: ${req.ip}`);
+    if (req.headers.accept && req.headers.accept.includes("application/json")) {
+      return res.status(429).json({
+        error: "TOO_MANY_REQUESTS",
+        message: "Action rate limit exceeded. Please wait a few moments before trying again.",
+      });
+    }
+    res.status(429).send("Action rate limit exceeded. Please wait a few moments before trying again.");
+  },
+});
+
+// ==========================================
+// CSRF PROTECTION (DOUBLE SUBMIT COOKIE)
+// ==========================================
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET || sessionSecret || "dev-fallback-secret-destination-paradise",
+  getSessionIdentifier: (req) => req.session?.id || req.sessionID || "guest-session",
+  cookieName: isProd ? "__Host-dp.x-csrf-token" : "dp.x-csrf-token",
+  cookieOptions: {
+    sameSite: "lax",
+    path: "/",
+    secure: isProd,
+    httpOnly: true,
+  },
+  size: 64,
+  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+  getCsrfTokenFromRequest: (req) => req.body?._csrf || req.headers["x-csrf-token"],
+});
+
+// Expose user and CSRF token to all templates
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
+  try {
+    res.locals.csrfToken = generateCsrfToken(req, res);
+  } catch (e) {
+    res.locals.csrfToken = "";
+  }
   next();
 });
+
+// Endpoint for programmatic / test CSRF token retrieval
+app.get("/csrf-token", (req, res) => {
+  res.json({ csrfToken: res.locals.csrfToken });
+});
+
+// Apply CSRF protection to all state-changing requests
+app.use(doubleCsrfProtection);
 
 // ==========================================
 // ROLE-BASED ACCESS CONTROL MIDDLEWARE
@@ -116,6 +225,31 @@ const requireDriver = (req, res, next) => {
 };
 
 // ==========================================
+// INPUT VALIDATION & SANITIZATION HELPERS
+// ==========================================
+
+const sanitizeString = (str, maxLen = 100) => {
+  if (typeof str !== "string") return "";
+  return str.trim().slice(0, maxLen);
+};
+
+const isValidEmail = (email) => {
+  if (!email || typeof email !== "string" || email.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+};
+
+const isValidPhone = (phone) => {
+  if (!phone || typeof phone !== "string") return false;
+  const digits = phone.replace(/[^0-9]/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+};
+
+const isValidCountryCode = (code) => {
+  if (!code || typeof code !== "string") return false;
+  return /^\+[0-9]{1,4}$/.test(code.trim());
+};
+
+// ==========================================
 // PUBLIC & TOURIST ROUTES
 // ==========================================
 
@@ -127,11 +261,15 @@ app.get("/register", (req, res) => {
   res.render("register");
 });
 
-app.post("/register", async (req, res) => {
+app.post("/register", authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password || password.length < 6) {
-    return res.status(400).send("Registration failed: Email and a password with at least 6 characters are required.");
+  if (!email || !password || password.length < 6 || password.length > 128) {
+    return res.status(400).send("Registration failed: Email and a password between 6 and 128 characters are required.");
+  }
+
+  if (!isValidEmail(email)) {
+    return res.status(400).send("Registration failed: A valid email address is required.");
   }
 
   try {
@@ -140,7 +278,7 @@ app.post("/register", async (req, res) => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, returnSecureToken: true }),
       }
     );
 
@@ -159,8 +297,11 @@ app.post("/register", async (req, res) => {
       updatedAt: now,
     });
 
-    req.session.user = { uid, email: data.email, role: "tourist" };
-    res.redirect("/");
+    req.session.regenerate((regErr) => {
+      if (regErr) console.error("Session regeneration error:", regErr);
+      req.session.user = { uid, email: data.email, role: "tourist" };
+      res.redirect("/");
+    });
   } catch (err) {
     res.status(400).send("Registration failed: " + (err.message || "An error occurred"));
   }
@@ -170,8 +311,12 @@ app.get("/login", (req, res) => {
   res.render("login");
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password || !isValidEmail(email)) {
+    return res.status(400).send("Login failed: A valid email and password are required.");
+  }
 
   try {
     const response = await fetch(
@@ -179,7 +324,7 @@ app.post("/login", async (req, res) => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, returnSecureToken: true }),
       }
     );
 
@@ -195,7 +340,11 @@ app.post("/login", async (req, res) => {
       if (userData.role === "driver") {
         return res.status(403).send("This account is registered as a Van Driver. Please log in via the Driver Portal at /driver/login.");
       }
-      req.session.user = { uid, email: data.email, role: "tourist" };
+      req.session.regenerate((regErr) => {
+        if (regErr) console.error("Session regeneration error:", regErr);
+        req.session.user = { uid, email: data.email, role: "tourist" };
+        res.redirect("/");
+      });
     } else {
       // Compatibility check: determine if this legacy account was a driver
       const driverDoc = await db.collection("drivers").doc(uid).get();
@@ -218,18 +367,23 @@ app.post("/login", async (req, res) => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      req.session.user = { uid, email: data.email, role: "tourist" };
+      req.session.regenerate((regErr) => {
+        if (regErr) console.error("Session regeneration error:", regErr);
+        req.session.user = { uid, email: data.email, role: "tourist" };
+        res.redirect("/");
+      });
     }
-
-    res.redirect("/");
   } catch (err) {
     res.status(400).send("Login failed: " + (err.message || "An error occurred"));
   }
 });
 
 app.get("/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect("/login");
+  req.session.destroy((err) => {
+    if (err) console.error("Session destroy error:", err);
+    res.clearCookie("dp.sid");
+    res.redirect("/login");
+  });
 });
 
 app.get("/dashboard", requireTourist, async (req, res) => {
@@ -282,7 +436,7 @@ app.get("/dashboard", requireTourist, async (req, res) => {
   }
 });
 
-app.post("/bookings", async (req, res) => {
+app.post("/bookings", actionLimiter, async (req, res) => {
   const user = req.session?.user;
 
   // Block unauthenticated users or non-tourists
@@ -306,50 +460,97 @@ app.post("/bookings", async (req, res) => {
 
   const email = user.email;
 
-  // Validate date range
+  // Validate strings and length bounds
+  const cleanDest = sanitizeString(destination, 100);
+  const cleanName = sanitizeString(name, 100);
+  const cleanCode = (countryCode || "").trim();
+  const cleanPhone = (phone || "").trim();
+  const cleanMarital = (maritalStatus || "").trim().toLowerCase();
+
+  if (!cleanDest || cleanDest.length < 2) {
+    return res.status(400).json({ message: "Destination name is required (at least 2 characters)." });
+  }
+  if (!cleanName || cleanName.length < 2) {
+    return res.status(400).json({ message: "Tourist contact name is required (at least 2 characters)." });
+  }
+  if (!isValidCountryCode(cleanCode)) {
+    return res.status(400).json({ message: "Invalid country code. Format e.g. +91, +1." });
+  }
+  if (!isValidPhone(cleanPhone)) {
+    return res.status(400).json({ message: "A valid phone number with 7 to 15 digits is required." });
+  }
+  if (cleanMarital !== "single" && cleanMarital !== "married") {
+    return res.status(400).json({ message: "Marital status must be either 'single' or 'married'." });
+  }
+
+  const passengerCount = parseInt(people, 10);
+  if (isNaN(passengerCount) || passengerCount < 1 || passengerCount > 20) {
+    return res.status(400).json({ message: "Passenger count must be an integer between 1 and 20." });
+  }
+
+  // Validate date strings and ranges
+  if (!isValidDateString(fromDate) || !isValidDateString(toDate)) {
+    return res.status(400).json({ message: "Dates must be valid in YYYY-MM-DD format." });
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const from = new Date(fromDate);
   const to = new Date(toDate);
   from.setHours(0, 0, 0, 0);
   to.setHours(0, 0, 0, 0);
 
-  if (isNaN(from) || isNaN(to) || from <= today || to <= from) {
-    return res.status(400).json({
-      message: "Dates must be valid. 'From' must be after today and 'To' must be after 'From'.",
-    });
+  if (from <= today) {
+    return res.status(400).json({ message: "'From' date must be at least tomorrow." });
+  }
+  if (to <= from) {
+    return res.status(400).json({ message: "'To' date must be after 'From' date." });
   }
 
-  if (
-    !destination?.trim() ||
-    !Number.isInteger(people) || people <= 0 ||
-    !name?.trim() ||
-    !countryCode?.trim() ||
-    !phone?.trim() ||
-    !maritalStatus?.trim()
-  ) {
-    return res.status(400).json({ message: "All fields are required and must be valid." });
+  // Maximum trip duration: 90 days
+  const diffDays = Math.round((to - from) / (1000 * 60 * 60 * 24));
+  if (diffDays > 90) {
+    return res.status(400).json({ message: "Trip duration cannot exceed 90 days." });
   }
 
   try {
-    // Check for conflicting active bookings (Requested or Confirmed)
+    // 1. Accidental rapid duplicate check (within last 60 seconds)
+    const recentDuplicates = await db
+      .collection("bookings")
+      .where("email", "==", email)
+      .where("destination", "==", cleanDest)
+      .where("fromDate", "==", fromDate)
+      .where("toDate", "==", toDate)
+      .get();
+
+    const nowMs = Date.now();
+    const isDuplicate = recentDuplicates.docs.some((doc) => {
+      const b = doc.data();
+      if (b.status === "Cancelled") return false;
+      const bTime = b.bookedAt?.toDate ? b.bookedAt.toDate().getTime() : new Date(b.bookedAt).getTime();
+      return nowMs - bTime < 60000;
+    });
+
+    if (isDuplicate) {
+      return res.status(409).json({
+        message: "A duplicate trip request was already submitted recently. Please check your dashboard.",
+      });
+    }
+
+    // 2. Check for conflicting active bookings for same destination
     const existingBookings = await db
       .collection("bookings")
       .where("email", "==", email)
-      .where("destination", "==", destination)
+      .where("destination", "==", cleanDest)
       .get();
 
     let conflict = false;
-
     existingBookings.forEach((doc) => {
       const data = doc.data();
-      if (data.status === "Cancelled") return; // Cancelled does not conflict
+      if (data.status === "Cancelled") return;
 
       const existingFrom = new Date(data.fromDate);
       const existingTo = new Date(data.toDate);
-
-      // Check if date ranges overlap
       if (from <= existingTo && to >= existingFrom) {
         conflict = true;
       }
@@ -366,23 +567,23 @@ app.post("/bookings", async (req, res) => {
     const booking = {
       bookingId: bookingRef.id,
       touristId: user.uid, // strictly server-authenticated session UID
-      destination: destination.trim(),
+      destination: cleanDest,
       fromDate,
       toDate,
-      people,
-      name: name.trim(),
+      people: passengerCount,
+      name: cleanName,
       email, // strictly from session
-      countryCode: countryCode.trim(),
-      phone: phone.trim(),
-      maritalStatus: maritalStatus.trim(),
-      status: "Requested", // Core Phase 4 business model: Requested
+      countryCode: cleanCode,
+      phone: cleanPhone,
+      maritalStatus: cleanMarital,
+      status: "Requested",
       driverId: null,
       bookedAt: now,
       updatedAt: now,
     };
 
     await bookingRef.set(booking);
-    console.log("✅ Trip request saved with ID:", bookingRef.id);
+    console.log(`✅ Validated trip request created: ID ${bookingRef.id} by ${email}`);
     return res.status(200).json({ message: "Trip request submitted! Available van drivers will review your trip." });
   } catch (error) {
     console.error("❌ Firestore error:", error.message);
@@ -390,7 +591,7 @@ app.post("/bookings", async (req, res) => {
   }
 });
 
-app.post("/cancel-booking/:id", requireTourist, async (req, res) => {
+app.post("/cancel-booking/:id", requireTourist, actionLimiter, async (req, res) => {
   try {
     const bookingRef = db.collection("bookings").doc(req.params.id);
     const booking = await bookingRef.get();
@@ -410,6 +611,7 @@ app.post("/cancel-booking/:id", requireTourist, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    console.log(`✅ Booking ${req.params.id} cancelled by tourist ${req.session.user.email}`);
     res.redirect("/dashboard");
   } catch (err) {
     console.error("❌ Cancel error:", err.message);
@@ -425,7 +627,7 @@ app.get("/driver/register", (req, res) => {
   res.render("driver-register");
 });
 
-app.post("/driver/register", async (req, res) => {
+app.post("/driver/register", authLimiter, async (req, res) => {
   const {
     name,
     email,
@@ -438,18 +640,35 @@ app.post("/driver/register", async (req, res) => {
     experienceYears,
   } = req.body;
 
+  const cleanName = sanitizeString(name, 100);
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanPhone = (phone || "").trim();
+  const cleanLicense = sanitizeString(licenseNumber, 50);
+  const cleanVanModel = sanitizeString(vanModel, 100);
+  const cleanVanNumber = sanitizeString(vanNumber, 30);
+
   // Validation
-  if (!name?.trim()) return res.status(400).send("Full name is required.");
-  if (!email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!cleanName || cleanName.length < 2) {
+    return res.status(400).send("Full name is required (at least 2 characters).");
+  }
+  if (!isValidEmail(cleanEmail)) {
     return res.status(400).send("A valid email address is required.");
   }
-  if (!password || password.length < 6) {
-    return res.status(400).send("Password must be at least 6 characters long.");
+  if (!password || password.length < 6 || password.length > 128) {
+    return res.status(400).send("Password must be between 6 and 128 characters long.");
   }
-  if (!phone?.trim()) return res.status(400).send("Phone number is required.");
-  if (!licenseNumber?.trim()) return res.status(400).send("Driver license number is required.");
-  if (!vanModel?.trim()) return res.status(400).send("Van model is required.");
-  if (!vanNumber?.trim()) return res.status(400).send("Vehicle plate/registration number is required.");
+  if (!isValidPhone(cleanPhone)) {
+    return res.status(400).send("A valid phone number with 7 to 15 digits is required.");
+  }
+  if (!cleanLicense || cleanLicense.length < 3) {
+    return res.status(400).send("A valid driver license number is required.");
+  }
+  if (!cleanVanModel || cleanVanModel.length < 2) {
+    return res.status(400).send("Van model description is required.");
+  }
+  if (!cleanVanNumber || cleanVanNumber.length < 3) {
+    return res.status(400).send("Vehicle plate / registration number is required.");
+  }
 
   const capacity = parseInt(seatingCapacity, 10);
   if (isNaN(capacity) || capacity < 4 || capacity > 20) {
@@ -457,8 +676,8 @@ app.post("/driver/register", async (req, res) => {
   }
 
   const experience = parseInt(experienceYears, 10);
-  if (isNaN(experience) || experience < 0) {
-    return res.status(400).send("Driving experience must be a non-negative number.");
+  if (isNaN(experience) || experience < 0 || experience > 60) {
+    return res.status(400).send("Driving experience must be between 0 and 60 years.");
   }
 
   try {
@@ -468,7 +687,7 @@ app.post("/driver/register", async (req, res) => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+        body: JSON.stringify({ email: cleanEmail, password, returnSecureToken: true }),
       }
     );
 
@@ -490,12 +709,12 @@ app.post("/driver/register", async (req, res) => {
     // Create drivers/{uid} document
     await db.collection("drivers").doc(uid).set({
       uid,
-      name: name.trim(),
+      name: cleanName,
       email: data.email,
-      phone: phone.trim(),
-      licenseNumber: licenseNumber.trim(),
-      vanModel: vanModel.trim(),
-      vanNumber: vanNumber.trim(),
+      phone: cleanPhone,
+      licenseNumber: cleanLicense,
+      vanModel: cleanVanModel,
+      vanNumber: cleanVanNumber,
       seatingCapacity: capacity,
       experienceYears: experience,
       verificationStatus: "pending",
@@ -504,8 +723,11 @@ app.post("/driver/register", async (req, res) => {
       updatedAt: now,
     });
 
-    req.session.user = { uid, email: data.email, role: "driver", name: name.trim() };
-    res.redirect("/driver/dashboard");
+    req.session.regenerate((regErr) => {
+      if (regErr) console.error("Session regeneration error:", regErr);
+      req.session.user = { uid, email: data.email, role: "driver", name: cleanName };
+      res.redirect("/driver/dashboard");
+    });
   } catch (err) {
     res.status(400).send("Driver registration failed: " + (err.message || "An error occurred"));
   }
@@ -515,8 +737,12 @@ app.get("/driver/login", (req, res) => {
   res.render("driver-login");
 });
 
-app.post("/driver/login", async (req, res) => {
+app.post("/driver/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password || !isValidEmail(email)) {
+    return res.status(400).send("Driver login failed: A valid email and password are required.");
+  }
 
   try {
     const response = await fetch(
@@ -524,7 +750,7 @@ app.post("/driver/login", async (req, res) => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, returnSecureToken: true }),
       }
     );
 
@@ -559,14 +785,16 @@ app.post("/driver/login", async (req, res) => {
     const driverDoc = await db.collection("drivers").doc(uid).get();
     const driverData = driverDoc.exists ? driverDoc.data() : {};
 
-    req.session.user = {
-      uid,
-      email: data.email,
-      role: "driver",
-      name: driverData.name || data.email,
-    };
-
-    res.redirect("/driver/dashboard");
+    req.session.regenerate((regErr) => {
+      if (regErr) console.error("Session regeneration error:", regErr);
+      req.session.user = {
+        uid,
+        email: data.email,
+        role: "driver",
+        name: driverData.name || data.email,
+      };
+      res.redirect("/driver/dashboard");
+    });
   } catch (err) {
     res.status(400).send("Driver login failed: " + (err.message || "An error occurred"));
   }
@@ -709,7 +937,7 @@ app.get("/driver/dashboard", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/toggle-active", requireDriver, async (req, res) => {
+app.post("/driver/toggle-active", requireDriver, actionLimiter, async (req, res) => {
   try {
     const driverRef = db.collection("drivers").doc(req.session.user.uid);
     const driverDoc = await driverRef.get();
@@ -750,7 +978,7 @@ app.get("/driver/profile", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/profile", requireDriver, async (req, res) => {
+app.post("/driver/profile", requireDriver, actionLimiter, async (req, res) => {
   const {
     name,
     phone,
@@ -761,11 +989,27 @@ app.post("/driver/profile", requireDriver, async (req, res) => {
     experienceYears,
   } = req.body;
 
-  if (!name?.trim()) return res.status(400).send("Full name is required.");
-  if (!phone?.trim()) return res.status(400).send("Phone number is required.");
-  if (!licenseNumber?.trim()) return res.status(400).send("Driver license number is required.");
-  if (!vanModel?.trim()) return res.status(400).send("Van model is required.");
-  if (!vanNumber?.trim()) return res.status(400).send("Vehicle registration number is required.");
+  const cleanName = sanitizeString(name, 100);
+  const cleanPhone = (phone || "").trim();
+  const cleanLicense = sanitizeString(licenseNumber, 50);
+  const cleanVanModel = sanitizeString(vanModel, 100);
+  const cleanVanNumber = sanitizeString(vanNumber, 30);
+
+  if (!cleanName || cleanName.length < 2) {
+    return res.status(400).send("Full name is required (at least 2 characters).");
+  }
+  if (!isValidPhone(cleanPhone)) {
+    return res.status(400).send("A valid phone number with 7 to 15 digits is required.");
+  }
+  if (!cleanLicense || cleanLicense.length < 3) {
+    return res.status(400).send("A valid driver license number is required.");
+  }
+  if (!cleanVanModel || cleanVanModel.length < 2) {
+    return res.status(400).send("Van model is required.");
+  }
+  if (!cleanVanNumber || cleanVanNumber.length < 3) {
+    return res.status(400).send("Vehicle registration number is required.");
+  }
 
   const capacity = parseInt(seatingCapacity, 10);
   if (isNaN(capacity) || capacity < 4 || capacity > 20) {
@@ -773,18 +1017,18 @@ app.post("/driver/profile", requireDriver, async (req, res) => {
   }
 
   const experience = parseInt(experienceYears, 10);
-  if (isNaN(experience) || experience < 0) {
-    return res.status(400).send("Driving experience must be a non-negative number.");
+  if (isNaN(experience) || experience < 0 || experience > 60) {
+    return res.status(400).send("Driving experience must be between 0 and 60 years.");
   }
 
   try {
     const driverRef = db.collection("drivers").doc(req.session.user.uid);
     const updatedData = {
-      name: name.trim(),
-      phone: phone.trim(),
-      licenseNumber: licenseNumber.trim(),
-      vanModel: vanModel.trim(),
-      vanNumber: vanNumber.trim(),
+      name: cleanName,
+      phone: cleanPhone,
+      licenseNumber: cleanLicense,
+      vanModel: cleanVanModel,
+      vanNumber: cleanVanNumber,
       seatingCapacity: capacity,
       experienceYears: experience,
       updatedAt: new Date(),
@@ -792,7 +1036,7 @@ app.post("/driver/profile", requireDriver, async (req, res) => {
 
     await driverRef.update(updatedData);
 
-    req.session.user.name = name.trim();
+    req.session.user.name = cleanName;
 
     const freshDoc = await driverRef.get();
     res.render("driver-profile", {
@@ -842,7 +1086,7 @@ app.get("/driver/availability", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/availability", requireDriver, async (req, res) => {
+app.post("/driver/availability", requireDriver, actionLimiter, async (req, res) => {
   const { fromDate, toDate, status } = req.body;
   const todayStr = getTodayDateString();
 
@@ -895,7 +1139,7 @@ app.post("/driver/availability", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/availability/:id/update", requireDriver, async (req, res) => {
+app.post("/driver/availability/:id/update", requireDriver, actionLimiter, async (req, res) => {
   const { fromDate, toDate, status } = req.body;
   const { id } = req.params;
   const todayStr = getTodayDateString();
@@ -951,7 +1195,7 @@ app.post("/driver/availability/:id/update", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/availability/:id/delete", requireDriver, async (req, res) => {
+app.post("/driver/availability/:id/delete", requireDriver, actionLimiter, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -974,7 +1218,7 @@ app.post("/driver/availability/:id/delete", requireDriver, async (req, res) => {
   }
 });
 
-app.post("/driver/availability/:id/toggle", requireDriver, async (req, res) => {
+app.post("/driver/availability/:id/toggle", requireDriver, actionLimiter, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -1083,7 +1327,7 @@ app.get("/driver/trips", requireDriver, async (req, res) => {
 // DRIVER ACCEPT TRIP ENDPOINT (TRANSACTIONAL)
 // ==========================================
 
-app.post("/driver/trips/:id/accept", requireDriver, async (req, res) => {
+app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, res) => {
   const tripId = req.params.id;
   const driverUid = req.session.user.uid;
   const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
@@ -1274,6 +1518,32 @@ app.get("/driver/my-trips", requireDriver, async (req, res) => {
     console.error("❌ Driver my-trips error:", err.message);
     res.status(500).send("Unable to load your accepted trips.");
   }
+});
+
+// ==========================================
+// CENTRALIZED ERROR HANDLER
+// ==========================================
+
+app.use((err, req, res, next) => {
+  if (err.code === "EBADCSRFTOKEN") {
+    console.warn(`⚠️ CSRF token validation failed: [${req.method}] ${req.originalUrl} from ${req.ip}`);
+    if (req.headers.accept && req.headers.accept.includes("application/json")) {
+      return res.status(403).json({
+        error: "EBADCSRFTOKEN",
+        message: "Invalid or missing CSRF token. Please refresh the page and try again.",
+      });
+    }
+    return res.status(403).send("Forbidden: Invalid or expired CSRF token. Please reload the page and try again.");
+  }
+
+  console.error("❌ Unhandled server error:", err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  if (req.headers.accept && req.headers.accept.includes("application/json")) {
+    return res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected server error occurred." });
+  }
+  res.status(500).send("Something went wrong on our end. Please try again later.");
 });
 
 // Start server

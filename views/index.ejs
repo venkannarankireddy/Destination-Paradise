@@ -72,6 +72,7 @@
     <div class="form-column">
       <h2>Book Your Dream Vacation</h2>
       <form id="bookForm">
+        <input type="hidden" id="csrfToken" name="_csrf" value="<%= csrfToken %>" />
         <label for="destination">Destination</label>
         <input type="text" id="destination" name="destination" required />
 

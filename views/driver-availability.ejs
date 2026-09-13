@@ -385,6 +385,7 @@
   <div class="card">
     <h2><span>📅</span> Add New Availability Window</h2>
     <form action="/driver/availability" method="POST" class="add-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="form-group">
         <label for="fromDate">From Date *</label>
         <input type="date" id="fromDate" name="fromDate" min="<%= todayStr %>" required />
@@ -442,6 +443,7 @@
               <td class="actions-cell">
                 <!-- TOGGLE STATUS -->
                 <form action="/driver/availability/<%= period.availabilityId %>/toggle" method="POST" style="display:inline;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <button type="submit" class="btn-action btn-toggle" title="Toggle status between available and unavailable">
                     <%= period.status === 'available' ? 'Mark Unavailable' : 'Mark Available' %>
                   </button>
@@ -454,6 +456,7 @@
 
                 <!-- DELETE BUTTON -->
                 <form action="/driver/availability/<%= period.availabilityId %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this availability window?');">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <button type="submit" class="btn-action btn-delete">Delete</button>
                 </form>
               </td>
@@ -473,6 +476,7 @@
       <button class="close-btn" onclick="closeEditModal()">&times;</button>
     </div>
     <form id="editForm" method="POST" class="modal-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="form-group">
         <label for="editFromDate">From Date *</label>
         <input type="date" id="editFromDate" name="fromDate" min="<%= todayStr %>" required />

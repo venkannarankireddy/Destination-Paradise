@@ -130,6 +130,7 @@
   <p class="subtext">Join Destination Paradise to connect with tourists for long-distance trips.</p>
 
   <form action="/driver/register" method="POST">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
       <label for="name">Full Name *</label>
       <input type="text" id="name" name="name" placeholder="e.g. John Doe" required />

@@ -96,6 +96,7 @@ a:hover {
   <div class="register-container">
     <h2>Register</h2>
     <form action="/register" method="post">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <!-- ✅ Added 'name' attributes -->
       <input type="email" id="email" name="email" placeholder="Email" required />
       <input type="password" id="password" name="password" placeholder="Password" required />
