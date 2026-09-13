@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Edit Van Profile | Destination Paradise</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #f7f9fc;
+      color: #333;
+      min-height: 100vh;
+    }
+    .driver-nav {
+      background-color: #1e293b;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .driver-nav .brand {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f06292;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .driver-nav .brand span {
+      background: #e91e63;
+      color: white;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: #e2e8f0;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: #f06292;
+    }
+    .logout-btn {
+      background: #dc2626;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+    .form-card {
+      background: white;
+      padding: 2rem 2.5rem;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .form-header {
+      margin-bottom: 1.8rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .form-header h2 {
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+    .back-link {
+      color: #64748b;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .back-link:hover {
+      color: #0f172a;
+    }
+    .alert-success {
+      background: #dcfce7;
+      color: #166534;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid #bbf7d0;
+    }
+    .alert-error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid #fecaca;
+    }
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+    .form-row {
+      display: flex;
+      gap: 1.2rem;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #1e293b;
+      background: #f8fafc;
+      transition: all 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #e91e63;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.15);
+    }
+    input:disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #475569;
+      margin: 1.5rem 0 1rem 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .btn-save {
+      background: #e91e63;
+      color: white;
+      padding: 0.85rem 1.8rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 1rem;
+      width: 100%;
+    }
+    .btn-save:hover {
+      background: #d81b60;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="driver-nav">
+  <a href="/driver/dashboard" class="brand">
+    Destination Paradise <span>DRIVER</span>
+  </a>
+  <div class="nav-links">
+    <a href="/driver/dashboard">Dashboard</a>
+    <a href="/driver/profile" class="active">Van Profile</a>
+    <a href="/driver/availability">Availability</a>
+    <a href="/driver/trips">Trip Requests</a>
+    <a href="/driver/my-trips">My Trips</a>
+    <a href="/logout" class="logout-btn">Logout</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="form-card">
+    <div class="form-header">
+      <h2>Driver & Van Profile</h2>
+      <a href="/driver/dashboard" class="back-link">&larr; Back to Dashboard</a>
+    </div>
+
+    <% if (typeof successMessage !== 'undefined' && successMessage) { %>
+      <div class="alert-success"><%= successMessage %></div>
+    <% } %>
+
+    <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
+      <div class="alert-error"><%= errorMessage %></div>
+    <% } %>
+
+    <form action="/driver/profile" method="POST">
+      <div class="section-title">Personal Information</div>
+
+      <div class="form-group">
+        <label for="name">Full Name *</label>
+        <input type="text" id="name" name="name" value="<%= driver.name %>" required />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">Email Address (Account ID)</label>
+          <input type="email" id="email" value="<%= driver.email %>" disabled />
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone Number *</label>
+          <input type="tel" id="phone" name="phone" value="<%= driver.phone %>" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="licenseNumber">Driver License # *</label>
+          <input type="text" id="licenseNumber" name="licenseNumber" value="<%= driver.licenseNumber %>" required />
+        </div>
+        <div class="form-group">
+          <label for="experienceYears">Driving Experience (Years) *</label>
+          <input type="number" id="experienceYears" name="experienceYears" min="0" max="60" value="<%= driver.experienceYears %>" required />
+        </div>
+      </div>
+
+      <div class="section-title">Van / Vehicle Information</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="vanModel">Van Model & Make *</label>
+          <input type="text" id="vanModel" name="vanModel" value="<%= driver.vanModel %>" required />
+        </div>
+        <div class="form-group">
+          <label for="vanNumber">Vehicle Plate / Registration # *</label>
+          <input type="text" id="vanNumber" name="vanNumber" value="<%= driver.vanNumber %>" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="seatingCapacity">Max Passenger Capacity (Seats: 4 - 20) *</label>
+        <input type="number" id="seatingCapacity" name="seatingCapacity" min="4" max="20" value="<%= driver.seatingCapacity %>" required />
+      </div>
+
+      <button type="submit" class="btn-save">Save Profile Changes</button>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>
+

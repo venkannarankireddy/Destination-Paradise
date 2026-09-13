@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Driver Dashboard | Destination Paradise</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #f7f9fc;
+      color: #333;
+      min-height: 100vh;
+    }
+    /* NAVBAR */
+    .driver-nav {
+      background-color: #1e293b;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .driver-nav .brand {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f06292;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .driver-nav .brand span {
+      background: #e91e63;
+      color: white;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: #e2e8f0;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: #f06292;
+    }
+    .logout-btn {
+      background: #dc2626;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: background 0.2s;
+    }
+    .logout-btn:hover {
+      background: #b91c1c;
+    }
+
+    /* CONTAINER */
+    .container {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .header-bar h1 {
+      font-size: 1.8rem;
+      color: #0f172a;
+    }
+
+    /* STATS / STATUS CARDS */
+    .status-banner {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .status-card {
+      background: white;
+      padding: 1.2rem 1.5rem;
+      border-radius: 12px;
+      flex: 1;
+      min-width: 220px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 4px solid #3b82f6;
+    }
+    .status-card.active-card {
+      border-left-color: #10b981;
+    }
+    .status-card.pending-card {
+      border-left-color: #f59e0b;
+    }
+    .status-card .label {
+      font-size: 0.85rem;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-card .value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 4px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .badge-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .badge-verified {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .badge-active {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    /* DETAILS GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.8rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .card h2 {
+      font-size: 1.2rem;
+      color: #1e293b;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 2px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card h2 a {
+      font-size: 0.85rem;
+      color: #e91e63;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .card h2 a:hover {
+      text-decoration: underline;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #f8fafc;
+      font-size: 0.95rem;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      color: #64748b;
+      font-weight: 500;
+    }
+    .info-value {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    /* QUICK ACTIONS */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .action-btn {
+      display: block;
+      background: white;
+      padding: 1.2rem;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #1e293b;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      border: 1px solid #e2e8f0;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+    .action-btn:hover {
+      border-color: #e91e63;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    }
+    .action-btn h3 {
+      font-size: 1rem;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .action-btn p {
+      font-size: 0.82rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+<!-- DRIVER NAVIGATION -->
+<nav class="driver-nav">
+  <a href="/driver/dashboard" class="brand">
+    Destination Paradise <span>DRIVER</span>
+  </a>
+  <div class="nav-links">
+    <a href="/driver/dashboard" class="active">Dashboard</a>
+    <a href="/driver/profile">Van Profile</a>
+    <a href="/driver/availability">Availability</a>
+    <a href="/driver/trips">Trip Requests</a>
+    <a href="/driver/my-trips">My Trips</a>
+    <a href="/logout" class="logout-btn">Logout</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="header-bar">
+    <div>
+      <h1>Welcome, <%= driver.name || user.email %>!</h1>
+      <p style="color: #64748b; margin-top: 4px;">Van Driver Matching Dashboard</p>
+    </div>
+    <a href="/driver/profile" style="background: #e91e63; color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Edit Van Profile</a>
+  </div>
+
+  <!-- STATUS BANNER -->
+  <div class="status-banner">
+    <div class="status-card pending-card">
+      <div>
+        <div class="label">Verification Status</div>
+        <div class="value">
+          <% if (driver.verificationStatus === 'verified') { %>
+            <span class="badge badge-verified">Verified Driver</span>
+          <% } else { %>
+            <span class="badge badge-pending">Pending Review</span>
+          <% } %>
+        </div>
+      </div>
+      <div style="font-size: 2rem;">🛡️</div>
+    </div>
+
+    <div class="status-card active-card">
+      <div>
+        <div class="label">Driver Status</div>
+        <div class="value">
+          <% if (driver.isActive) { %>
+            <span class="badge badge-active">Active</span>
+          <% } else { %>
+            <span class="badge badge-pending">Inactive</span>
+          <% } %>
+        </div>
+      </div>
+      <div style="font-size: 2rem;">🚐</div>
+    </div>
+
+    <div class="status-card">
+      <div>
+        <div class="label">Seating Capacity</div>
+        <div class="value"><%= driver.seatingCapacity %> Seats</div>
+      </div>
+      <div style="font-size: 2rem;">👥</div>
+    </div>
+  </div>
+
+  <!-- DETAILS GRID -->
+  <div class="grid">
+    <!-- Driver Info -->
+    <div class="card">
+      <h2>Driver Profile <a href="/driver/profile">Edit</a></h2>
+      <div class="info-row">
+        <span class="info-label">Full Name</span>
+        <span class="info-value"><%= driver.name %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Email Address</span>
+        <span class="info-value"><%= driver.email %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Phone Number</span>
+        <span class="info-value"><%= driver.phone %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Driver License #</span>
+        <span class="info-value"><%= driver.licenseNumber %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Experience</span>
+        <span class="info-value"><%= driver.experienceYears %> Years</span>
+      </div>
+    </div>
+
+    <!-- Vehicle Info -->
+    <div class="card">
+      <h2>Van / Vehicle Details <a href="/driver/profile">Edit</a></h2>
+      <div class="info-row">
+        <span class="info-label">Van Model</span>
+        <span class="info-value"><%= driver.vanModel %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Plate / Registration #</span>
+        <span class="info-value"><%= driver.vanNumber %></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Max Passengers</span>
+        <span class="info-value"><%= driver.seatingCapacity %> Passengers</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Vehicle Type</span>
+        <span class="info-value">Tourist Van / Tempo</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Registered On</span>
+        <span class="info-value">
+          <%= driver.createdAt ? (typeof driver.createdAt.toDate === 'function' ? driver.createdAt.toDate().toLocaleDateString() : new Date(driver.createdAt).toLocaleDateString()) : 'N/A' %>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE QUICK ACCESS -->
+  <h2 style="font-size: 1.2rem; color: #1e293b; margin-bottom: 1rem;">Platform Modules</h2>
+  <div class="actions-grid">
+    <a href="/driver/profile" class="action-btn">
+      <h3>🚐 Van Profile</h3>
+      <p>Update vehicle specs & capacity</p>
+    </a>
+    <a href="/driver/availability" class="action-btn">
+      <h3>📅 Availability</h3>
+      <p>Manage operating schedule (Phase 3)</p>
+    </a>
+    <a href="/driver/trips" class="action-btn">
+      <h3>📍 Trip Requests</h3>
+      <p>Browse tourist long-distance trips (Phase 4)</p>
+    </a>
+    <a href="/driver/my-trips" class="action-btn">
+      <h3>🗓️ My Trips</h3>
+      <p>View accepted bookings (Phase 4)</p>
+    </a>
+  </div>
+</div>
+
+</body>
+</html>
+

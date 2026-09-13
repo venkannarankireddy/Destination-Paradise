@@ -44,7 +44,10 @@
 </head>
 <body>
   <h2>Welcome, <%= user.email %></h2>
-  <button onclick="window.location.href='/logout'">Logout</button>
+  <div style="display: flex; gap: 10px; margin-bottom: 2rem;">
+    <button onclick="window.location.href='/'" style="background: #333;">&larr; Back to Home</button>
+    <button onclick="window.location.href='/logout'">Logout</button>
+  </div>
 
   <h2>Your Bookings</h2>
 

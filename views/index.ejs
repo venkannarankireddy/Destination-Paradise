@@ -30,11 +30,18 @@
       <% if (!user) { %>
         <a href="/login" class="nav-auth-btn">Login</a>
         <a href="/register" class="nav-auth-btn">Register</a>
+        <a href="/driver/login" class="nav-auth-btn" style="background-color: #1e293b; color: #fff;">Drive With Us</a>
+        <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
+      <% } else if (user.role === 'driver') { %>
+        <span style="font-weight: 600; color: #1e293b; margin-right: 10px;">🚐 Driver: <%= user.email %></span>
+        <a href="/driver/dashboard" class="nav-auth-btn" style="background-color: #1e293b;">Dashboard</a>
+        <a href="/driver/profile" class="nav-auth-btn" style="background-color: #334155;">Van Profile</a>
+        <a href="/logout" class="nav-auth-btn">Logout</a>
       <% } else { %>
-        <span>Welcome, <%= user.email %></span>
+        <span style="margin-right: 10px;">Welcome, <%= user.email %></span>
+        <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
         <a href="/logout" class="nav-auth-btn">Logout</a>
       <% } %>
-      <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
     </div>
   </nav>
 
