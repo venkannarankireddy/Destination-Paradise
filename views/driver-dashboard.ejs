@@ -106,7 +106,7 @@
       padding: 1.2rem 1.5rem;
       border-radius: 12px;
       flex: 1;
-      min-width: 220px;
+      min-width: 240px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
       display: flex;
       align-items: center;
@@ -126,7 +126,7 @@
       text-transform: uppercase;
     }
     .status-card .value {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 700;
       color: #0f172a;
       margin-top: 4px;
@@ -149,6 +149,14 @@
     .badge-active {
       background: #dcfce7;
       color: #166534;
+    }
+    .badge-available {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-unavailable {
+      background: #f1f5f9;
+      color: #64748b;
     }
 
     /* DETAILS GRID */
@@ -260,11 +268,48 @@
       <h1>Welcome, <%= driver.name || user.email %>!</h1>
       <p style="color: #64748b; margin-top: 4px;">Van Driver Matching Dashboard</p>
     </div>
-    <a href="/driver/profile" style="background: #e91e63; color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Edit Van Profile</a>
+    <div style="display: flex; gap: 10px;">
+      <a href="/driver/availability" style="background: #1e293b; color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Manage Availability</a>
+      <a href="/driver/profile" style="background: #e91e63; color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">Edit Van Profile</a>
+    </div>
   </div>
 
   <!-- STATUS BANNER -->
   <div class="status-banner">
+    <!-- ACTIVE STATUS TOGGLE -->
+    <div class="status-card <%= driver.isActive ? 'active-card' : 'pending-card' %>">
+      <div>
+        <div class="label">Driver Active Status</div>
+        <div class="value" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+          <% if (driver.isActive) { %>
+            <span class="badge badge-active">● Active</span>
+          <% } else { %>
+            <span class="badge badge-pending" style="background:#f1f5f9; color:#64748b;">● Inactive</span>
+          <% } %>
+          <form action="/driver/toggle-active" method="POST" style="display: inline;">
+            <button type="submit" style="background: none; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #475569;">
+              <%= driver.isActive ? 'Pause' : 'Activate' %>
+            </button>
+          </form>
+        </div>
+        <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+          <%= driver.isActive ? 'Accepting trip requests.' : 'Temporarily paused from receiving requests.' %>
+        </p>
+      </div>
+      <div style="font-size: 2rem;">🚐</div>
+    </div>
+
+    <!-- AVAILABILITY PERIODS STAT -->
+    <div class="status-card">
+      <div>
+        <div class="label">Availability Periods</div>
+        <div class="value"><%= availabilities.length %> Windows Scheduled</div>
+        <a href="/driver/availability" style="font-size: 0.78rem; color: #e91e63; text-decoration: none; font-weight: 600;">+ Manage Dates</a>
+      </div>
+      <div style="font-size: 2rem;">📅</div>
+    </div>
+
+    <!-- VERIFICATION STATUS -->
     <div class="status-card pending-card">
       <div>
         <div class="label">Verification Status</div>
@@ -278,28 +323,37 @@
       </div>
       <div style="font-size: 2rem;">🛡️</div>
     </div>
+  </div>
 
-    <div class="status-card active-card">
-      <div>
-        <div class="label">Driver Status</div>
-        <div class="value">
-          <% if (driver.isActive) { %>
-            <span class="badge badge-active">Active</span>
-          <% } else { %>
-            <span class="badge badge-pending">Inactive</span>
-          <% } %>
-        </div>
-      </div>
-      <div style="font-size: 2rem;">🚐</div>
-    </div>
+  <!-- UPCOMING AVAILABILITY SECTION -->
+  <div class="card" style="margin-bottom: 2rem;">
+    <h2>
+      Upcoming Availability
+      <a href="/driver/availability">+ Manage Availability</a>
+    </h2>
 
-    <div class="status-card">
-      <div>
-        <div class="label">Seating Capacity</div>
-        <div class="value"><%= driver.seatingCapacity %> Seats</div>
+    <% if (availabilities.length === 0) { %>
+      <div style="padding: 1.2rem 0; color: #64748b;">
+        <p style="font-weight: 600; color: #334155;">No availability periods added yet.</p>
+        <p style="font-size: 0.9rem; margin-top: 4px;">Add the date ranges when you and your van are ready to drive tourists.</p>
+        <a href="/driver/availability" style="display: inline-block; margin-top: 10px; background: #e91e63; color: white; padding: 6px 14px; border-radius: 6px; font-weight: 600; text-decoration: none; font-size: 0.88rem;">+ Add Availability</a>
       </div>
-      <div style="font-size: 2rem;">👥</div>
-    </div>
+    <% } else { %>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 0.8rem;">
+        <% availabilities.forEach((period) => { %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border-left: 4px solid <%= period.status === 'available' ? '#10b981' : '#94a3b8' %>;">
+            <div>
+              <span style="font-weight: 700; color: #0f172a; font-size: 1rem;"><%= period.fromDate %> &rarr; <%= period.toDate %></span>
+            </div>
+            <div>
+              <span class="badge <%= period.status === 'available' ? 'badge-available' : 'badge-unavailable' %>">
+                <%= period.status === 'available' ? 'Available' : 'Unavailable' %>
+              </span>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 
   <!-- DETAILS GRID -->
@@ -366,7 +420,7 @@
     </a>
     <a href="/driver/availability" class="action-btn">
       <h3>📅 Availability</h3>
-      <p>Manage operating schedule (Phase 3)</p>
+      <p>Manage operating schedule</p>
     </a>
     <a href="/driver/trips" class="action-btn">
       <h3>📍 Trip Requests</h3>
@@ -381,4 +435,3 @@
 
 </body>
 </html>
-

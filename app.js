@@ -556,6 +556,61 @@ app.post("/driver/login", async (req, res) => {
   }
 });
 
+// ==========================================
+// DATE & AVAILABILITY HELPERS
+// ==========================================
+
+const getTodayDateString = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const isValidDateString = (str) => {
+  if (!str || typeof str !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return false;
+  }
+  const [y, m, d] = str.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() === m - 1 &&
+    date.getUTCDate() === d
+  );
+};
+
+const checkAvailabilityOverlap = async (dbInstance, driverUid, newFrom, newTo, excludeId = null) => {
+  const snapshot = await dbInstance
+    .collection("drivers")
+    .doc(driverUid)
+    .collection("availability")
+    .get();
+
+  for (const doc of snapshot.docs) {
+    if (excludeId && doc.id === excludeId) continue;
+    const data = doc.data();
+    const existingFrom = data.fromDate;
+    const existingTo = data.toDate;
+
+    // Overlap condition: (newFrom <= existingTo) && (newTo >= existingFrom)
+    if (newFrom <= existingTo && newTo >= existingFrom) {
+      return {
+        overlap: true,
+        conflictingPeriod: {
+          id: doc.id,
+          fromDate: existingFrom,
+          toDate: existingTo,
+          status: data.status,
+        },
+      };
+    }
+  }
+
+  return { overlap: false };
+};
+
 app.get("/driver/dashboard", requireDriver, async (req, res) => {
   try {
     const driverDoc = await db.collection("drivers").doc(req.session.user.uid).get();
@@ -564,13 +619,56 @@ app.get("/driver/dashboard", requireDriver, async (req, res) => {
       return res.status(404).send("Driver profile not found.");
     }
 
+    const availSnapshot = await db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .orderBy("fromDate", "asc")
+      .get();
+
+    const todayStr = getTodayDateString();
+    const availabilities = [];
+    availSnapshot.forEach((doc) => {
+      const data = doc.data();
+      availabilities.push({
+        availabilityId: doc.id,
+        ...data,
+      });
+    });
+
+    const upcomingAvailabilities = availabilities.filter((p) => p.toDate >= todayStr);
+
     res.render("driver-dashboard", {
       driver: driverDoc.data(),
+      availabilities: upcomingAvailabilities,
+      totalAvailabilities: availabilities.length,
       user: req.session.user,
     });
   } catch (err) {
     console.error("❌ Driver dashboard error:", err.message);
     res.status(500).send("Unable to load driver dashboard.");
+  }
+});
+
+app.post("/driver/toggle-active", requireDriver, async (req, res) => {
+  try {
+    const driverRef = db.collection("drivers").doc(req.session.user.uid);
+    const driverDoc = await driverRef.get();
+
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+
+    const currentStatus = !!driverDoc.data().isActive;
+    await driverRef.update({
+      isActive: !currentStatus,
+      updatedAt: new Date(),
+    });
+
+    res.redirect("/driver/dashboard");
+  } catch (err) {
+    console.error("❌ Driver active toggle error:", err.message);
+    res.status(500).send("Unable to update active status.");
   }
 });
 
@@ -621,7 +719,6 @@ app.post("/driver/profile", requireDriver, async (req, res) => {
   }
 
   try {
-    // Strictly update driver by session UID (never trust external input UID)
     const driverRef = db.collection("drivers").doc(req.session.user.uid);
     const updatedData = {
       name: name.trim(),
@@ -651,18 +748,204 @@ app.post("/driver/profile", requireDriver, async (req, res) => {
   }
 });
 
-// Placeholder routes for navigation links
-app.get("/driver/availability", requireDriver, (req, res) => {
-  res.render("driver-placeholder", {
-    title: "Driver Availability",
-    phase: "Phase 3: Scheduling",
-    icon: "📅",
-    description: "Set your active working days, operating routes, and blackout dates. This module will be activated in Phase 3.",
-    activeTab: "availability",
-    user: req.session.user,
-  });
+// ==========================================
+// DRIVER AVAILABILITY ROUTES
+// ==========================================
+
+app.get("/driver/availability", requireDriver, async (req, res) => {
+  try {
+    const availSnapshot = await db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .orderBy("fromDate", "asc")
+      .get();
+
+    const availabilities = [];
+    availSnapshot.forEach((doc) => {
+      const data = doc.data();
+      availabilities.push({
+        availabilityId: doc.id,
+        ...data,
+      });
+    });
+
+    res.render("driver-availability", {
+      availabilities,
+      user: req.session.user,
+      todayStr: getTodayDateString(),
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+    });
+  } catch (err) {
+    console.error("❌ Driver availability fetch error:", err.message);
+    res.status(500).send("Unable to load availability.");
+  }
 });
 
+app.post("/driver/availability", requireDriver, async (req, res) => {
+  const { fromDate, toDate, status } = req.body;
+  const todayStr = getTodayDateString();
+
+  if (!fromDate || !toDate) {
+    return res.redirect("/driver/availability?err=Both+from+and+to+dates+are+required.");
+  }
+
+  if (!isValidDateString(fromDate) || !isValidDateString(toDate)) {
+    return res.redirect("/driver/availability?err=Invalid+date+format.+Use+YYYY-MM-DD.");
+  }
+
+  if (fromDate < todayStr) {
+    return res.redirect("/driver/availability?err=Availability+cannot+start+in+the+past.");
+  }
+
+  if (toDate < fromDate) {
+    return res.redirect("/driver/availability?err=From+date+cannot+be+after+to+date.");
+  }
+
+  try {
+    const overlapResult = await checkAvailabilityOverlap(db, req.session.user.uid, fromDate, toDate);
+    if (overlapResult.overlap) {
+      const conf = overlapResult.conflictingPeriod;
+      return res.redirect(
+        `/driver/availability?err=Overlapping+period+detected.+You+already+have+availability+from+${conf.fromDate}+to+${conf.toDate}.`
+      );
+    }
+
+    const availRef = db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .doc();
+
+    const now = new Date();
+    await availRef.set({
+      availabilityId: availRef.id,
+      driverId: req.session.user.uid,
+      fromDate,
+      toDate,
+      status: status === "unavailable" ? "unavailable" : "available",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    res.redirect("/driver/availability?msg=Availability+window+added+successfully!");
+  } catch (err) {
+    console.error("❌ Add availability error:", err.message);
+    res.redirect("/driver/availability?err=Failed+to+save+availability.");
+  }
+});
+
+app.post("/driver/availability/:id/update", requireDriver, async (req, res) => {
+  const { fromDate, toDate, status } = req.body;
+  const { id } = req.params;
+  const todayStr = getTodayDateString();
+
+  if (!fromDate || !toDate) {
+    return res.redirect("/driver/availability?err=Both+from+and+to+dates+are+required.");
+  }
+
+  if (!isValidDateString(fromDate) || !isValidDateString(toDate)) {
+    return res.redirect("/driver/availability?err=Invalid+date+format.+Use+YYYY-MM-DD.");
+  }
+
+  if (fromDate < todayStr) {
+    return res.redirect("/driver/availability?err=Availability+cannot+start+in+the+past.");
+  }
+
+  if (toDate < fromDate) {
+    return res.redirect("/driver/availability?err=From+date+cannot+be+after+to+date.");
+  }
+
+  try {
+    const availDocRef = db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .doc(id);
+
+    const docSnap = await availDocRef.get();
+    if (!docSnap.exists) {
+      return res.redirect("/driver/availability?err=Availability+record+not+found.");
+    }
+
+    // Overlap check excluding current record
+    const overlapResult = await checkAvailabilityOverlap(db, req.session.user.uid, fromDate, toDate, id);
+    if (overlapResult.overlap) {
+      const conf = overlapResult.conflictingPeriod;
+      return res.redirect(
+        `/driver/availability?err=Cannot+update:+overlaps+with+existing+period+${conf.fromDate}+to+${conf.toDate}.`
+      );
+    }
+
+    await availDocRef.update({
+      fromDate,
+      toDate,
+      status: status === "unavailable" ? "unavailable" : "available",
+      updatedAt: new Date(),
+    });
+
+    res.redirect("/driver/availability?msg=Availability+period+updated+successfully!");
+  } catch (err) {
+    console.error("❌ Update availability error:", err.message);
+    res.redirect("/driver/availability?err=Failed+to+update+availability.");
+  }
+});
+
+app.post("/driver/availability/:id/delete", requireDriver, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const availDocRef = db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .doc(id);
+
+    const docSnap = await availDocRef.get();
+    if (!docSnap.exists) {
+      return res.redirect("/driver/availability?err=Availability+record+not+found.");
+    }
+
+    await availDocRef.delete();
+    res.redirect("/driver/availability?msg=Availability+window+deleted+successfully.");
+  } catch (err) {
+    console.error("❌ Delete availability error:", err.message);
+    res.redirect("/driver/availability?err=Failed+to+delete+availability.");
+  }
+});
+
+app.post("/driver/availability/:id/toggle", requireDriver, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const availDocRef = db
+      .collection("drivers")
+      .doc(req.session.user.uid)
+      .collection("availability")
+      .doc(id);
+
+    const docSnap = await availDocRef.get();
+    if (!docSnap.exists) {
+      return res.redirect("/driver/availability?err=Availability+record+not+found.");
+    }
+
+    const currentStatus = docSnap.data().status;
+    const newStatus = currentStatus === "available" ? "unavailable" : "available";
+
+    await availDocRef.update({
+      status: newStatus,
+      updatedAt: new Date(),
+    });
+
+    res.redirect(`/driver/availability?msg=Status+updated+to+${newStatus}.`);
+  } catch (err) {
+    console.error("❌ Toggle availability error:", err.message);
+    res.redirect("/driver/availability?err=Failed+to+toggle+status.");
+  }
+});
+
+// Placeholder routes for remaining navigation links
 app.get("/driver/trips", requireDriver, (req, res) => {
   res.render("driver-placeholder", {
     title: "Trip Requests Marketplace",
