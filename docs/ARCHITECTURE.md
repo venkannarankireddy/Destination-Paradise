@@ -4,6 +4,8 @@
 
 Destination Paradise is a two-sided travel marketplace connecting **Tourists** seeking customized travel with verified **Van Drivers** offering vehicle capacity and regional route availability. The platform operates on a direct contact & matching model: tourists submit trip requests, verified van drivers with matching seating capacity and scheduled calendar availability discover these requests in real time, negotiate trip terms and pricing directly via telephone or WhatsApp, and lock in trips on the platform via atomic transactions.
 
+The platform provides a complete **Trip Lifecycle State Machine** (`Requested` $\to$ `Accepted` $\to$ `In Progress` $\to$ `Completed`, with controlled terminal `Cancelled` states) and an **In-App Notification Engine** alerting tourists and drivers at every operational milestone.
+
 An administrative governance layer (**Admin Portal**) provides supervisory controls, review and verification of driver applicants, active status management, and platform-wide monitoring.
 
 ---
@@ -20,6 +22,7 @@ An administrative governance layer (**Admin Portal**) provides supervisory contr
   - `helmet`: Content-Security-Policy, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
   - `csrf-csrf`: Double-submit HMAC CSRF token protection
   - `express-rate-limit`: Multi-tiered IP rate limiting (Auth and Action limiters)
+- **Timezone Standard:** Defined by `APP_TIMEZONE` (default: `Asia/Colombo`)
 
 ---
 
@@ -32,9 +35,9 @@ An administrative governance layer (**Admin Portal**) provides supervisory contr
 | `/register` | `GET`, `POST` | Public (Anonymous) | Tourist account creation |
 | `/logout` | `GET` | Authenticated | Destroys active session and clears session cookie |
 | `/csrf-token` | `GET` | Public | Returns a fresh CSRF token for AJAX clients |
-| `/dashboard` | `GET` | **Tourist Only** | Displays tourist's trip history, statuses, and assigned driver details |
+| `/dashboard` | `GET` | **Tourist Only** | Displays tourist's trip history, lifecycle progress stepper, and assigned driver details |
 | `/bookings` | `POST` | **Tourist Only** | Submits a new trip request with status `"Requested"` |
-| `/cancel-booking/:id` | `POST` | **Tourist Only** | Cancels a pending or accepted trip request |
+| `/cancel-booking/:id` | `POST` | **Tourist Only** | Atomically cancels a `Requested` or `Accepted` trip request |
 | `/driver/login` | `GET`, `POST` | Public (Anonymous) | Van Driver portal login |
 | `/driver/register` | `GET`, `POST` | Public (Anonymous) | Van Driver account registration and profile initialization |
 | `/driver/dashboard` | `GET` | **Driver Only** | Driver portal home: active status toggle, availability summary, match count |
@@ -46,12 +49,18 @@ An administrative governance layer (**Admin Portal**) provides supervisory contr
 | `/driver/availability/:id/toggle` | `POST` | **Driver Only** | Toggles window status between `available` and `unavailable` |
 | `/driver/trips` | `GET` | **Driver Only** | Marketplace of open trip requests matching driver capacity, dates, and verification |
 | `/driver/trips/:id/accept` | `POST` | **Driver Only** | Atomically accepts a trip request with concurrency, overlap, and verification validation |
-| `/driver/my-trips` | `GET` | **Driver Only** | Driver's schedule of accepted trips (Upcoming & Past) with tourist contact info |
+| `/driver/trips/:id/start` | `POST` | **Driver Only** | Validates scheduled dates in `APP_TIMEZONE` and transitions trip to `"In Progress"` |
+| `/driver/trips/:id/complete` | `POST` | **Driver Only** | Validates en route status and transitions trip to `"Completed"` (releases schedule) |
+| `/driver/trips/:id/cancel` | `POST` | **Driver Only** | Emergency driver cancellation requiring reason; preserves driver snapshot |
+| `/driver/my-trips` | `GET` | **Driver Only** | Segmented schedule (In Progress, Upcoming Accepted, Completed, Cancelled) |
+| `/notifications` | `GET` | **Authenticated** | In-app notification feed with unread count and action links |
+| `/notifications/:id/read` | `POST` | **Authenticated** | Marks a notification as read (scoped to document owner) |
+| `/notifications/mark-all-read` | `POST` | **Authenticated** | Batches all unread notifications for logged-in user |
 | `/admin` | `GET` | **Admin Only** | Admin Dashboard: Operational metrics, pending review queue, recent activity |
 | `/admin/drivers` | `GET` | **Admin Only** | Driver Directory: Paginated/filtered driver list (`pending`, `verified`, `rejected`, `active`, `inactive`) and search |
 | `/admin/drivers/:id` | `GET` | **Admin Only** | Driver Review Page: Personal, credentials, vehicle specs, and audit trail |
-| `/admin/drivers/:id/verify` | `POST` | **Admin Only** | Approves driver application (`verificationStatus: "verified"`). CSRF protected |
-| `/admin/drivers/:id/reject` | `POST` | **Admin Only** | Rejects driver application (`verificationStatus: "rejected"`). CSRF protected |
+| `/admin/drivers/:id/verify` | `POST` | **Admin Only** | Approves driver application (`verificationStatus: "verified"`) and dispatches notification |
+| `/admin/drivers/:id/reject` | `POST` | **Admin Only** | Rejects driver application (`verificationStatus: "rejected"`) and dispatches notification |
 | `/admin/drivers/:id/toggle-active` | `POST` | **Admin Only** | Toggles driver `isActive` status (preserves `verificationStatus`). CSRF protected |
 | `/admin/trips` | `GET` | **Admin Only** | Platform Trips Monitor: Read-only tracking of all platform bookings |
 | `/admin/users` | `GET` | **Admin Only** | Platform Users Registry: Read-only directory of all user accounts |
@@ -126,7 +135,7 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
   "countryCode": "string (e.g. +91)",
   "phone": "string",
   "maritalStatus": "string (single | married)",
-  "status": "Requested" | "Accepted" | "Cancelled" | "Confirmed (legacy)",
+  "status": "Requested" | "Accepted" | "In Progress" | "Completed" | "Cancelled" | "Confirmed (legacy)",
   "driverId": "string | null",
   "driverName": "string | null",
   "driverPhone": "string | null",
@@ -136,13 +145,74 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
   "seatingCapacity": "number | null",
   "bookedAt": "Timestamp",
   "acceptedAt": "Timestamp | null",
+  "startedAt": "Timestamp | null",
+  "completedAt": "Timestamp | null",
+  "cancelledAt": "Timestamp | null",
+  "cancelledBy": "string ('tourist' | 'driver' | null)",
+  "cancellationReason": "string | null",
   "updatedAt": "Timestamp"
+}
+```
+
+### Collection: `notifications`
+Documents keyed by deterministic ID: `notifications/{notificationId}`
+- Booking events: `notif_${bookingId}_${EVENT_TYPE}`
+- Driver verification events: `notif_${driverUid}_${EVENT_TYPE}`
+```json
+{
+  "notificationId": "string",
+  "userId": "string (Session UID of recipient)",
+  "userRole": "tourist" | "driver" | "admin",
+  "type": "TRIP_ACCEPTED" | "TRIP_STARTED" | "TRIP_COMPLETED" | "TRIP_CANCELLED" | "DRIVER_VERIFIED" | "DRIVER_REJECTED",
+  "title": "string",
+  "message": "string",
+  "link": "string | null",
+  "relatedTripId": "string | null",
+  "isRead": "boolean",
+  "createdAt": "Timestamp",
+  "readAt": "Timestamp | null"
 }
 ```
 
 ---
 
-## 5. Driver Verification Lifecycle & Marketplace Matching
+## 5. Trip Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Requested: Tourist submits trip request
+    Requested --> Accepted: Verified & Active driver accepts trip
+    Requested --> Cancelled: Tourist cancels open request
+    Accepted --> In_Progress: Assigned driver starts trip (fromDate <= today <= toDate)
+    Accepted --> Cancelled: Tourist pre-trip cancellation
+    Accepted --> Cancelled: Driver emergency withdrawal (reason required)
+    In_Progress --> Completed: Driver completes journey
+    In_Progress --> Cancelled: Driver emergency cancellation (reason required)
+    Requested --> Confirmed: Legacy bookings (backward compatibility)
+    Cancelled --> [*]: Terminal State
+    Completed --> [*]: Terminal State
+```
+
+### State Transition Invariants:
+1. **Start-Trip Date Validation:**
+   - Enforces `trip.fromDate <= today <= trip.toDate` where `today` is calculated in `APP_TIMEZONE` (`Asia/Colombo`).
+   - Early start attempts before `fromDate` are rejected with HTTP 400 (`TRIP_TOO_EARLY`).
+   - Late start attempts after `toDate` are rejected with HTTP 400 (`TRIP_PAST_WINDOW`).
+2. **Atomic Transitions & Notifications:**
+   - State mutations and notification creations are committed atomically within `db.runTransaction` or batch.
+   - Deterministic notification IDs prevent duplicates upon repeated requests or transaction retries.
+3. **Driver Emergency Cancellation & Snapshot Preservation:**
+   - Both `Accepted` and `In Progress` driver cancellations require a valid reason ($\ge 5$ characters).
+   - Driver snapshot fields (`driverId`, `driverName`, `driverPhone`, `driverEmail`, `vanModel`, `vanNumber`, `seatingCapacity`) are **strictly preserved** on the booking document for audit and reporting.
+4. **Schedule Overlap Protection:**
+   - `Accepted` and `In Progress` trips actively block the assigned driver from accepting overlapping trips.
+   - `Completed` and `Cancelled` trips immediately release the driver's calendar for new bookings.
+5. **Terminal States:**
+   - `Completed` and `Cancelled` are non-mutable terminal states. Any mutation attempt returns HTTP 400 Bad Request.
+
+---
+
+## 6. Driver Verification Lifecycle & Marketplace Matching
 
 ### Canonical Verification States:
 1. `pending`: Initial status upon driver registration. The driver cannot match trips or accept bookings.
@@ -150,7 +220,7 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
 3. `rejected`: Rejected by an administrator. The driver is strictly barred from matching requests and accepting bookings.
 
 ### Production Marketplace Eligibility Matrix:
-| Verification Status | Active Status | Marketplace Matching | Trip Acceptance |
+| Verification Status | Active Status | Marketplace Matching | Trip Acceptance & Lifecycle |
 |---|---|---|---|
 | `verified` | `true` | **Eligible** | **Allowed** |
 | `verified` | `false` | Not Eligible | Blocked (`DRIVER_INACTIVE`) |
@@ -161,7 +231,7 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
 
 ---
 
-## 6. Administrator Provisioning Security Model
+## 7. Administrator Provisioning Security Model
 
 - **No Public Registration:** There is no `/admin/register` endpoint. Normal user registration exclusively issues `role: "tourist"` (at `/register`) or `role: "driver"` (at `/driver/register`).
 - **No Dynamic Promotion:** The server does not dynamically upgrade roles during normal login based on client-controlled parameters or simple email matching.
@@ -175,32 +245,12 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
 
 ---
 
-## 7. State Machine & Booking Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Requested: Tourist submits trip request
-    Requested --> Accepted: Verified & Active driver accepts trip
-    Requested --> Cancelled: Tourist cancels before assignment
-    Accepted --> Cancelled: Tourist cancels accepted trip
-    Requested --> Confirmed: Legacy bookings (supported for backward compatibility)
-    Cancelled --> [*]
-    Accepted --> [*]
-```
-
-### Lifecycle Rules:
-1. **New Bookings**: Created with initial status `Requested`, `driverId: null`, and assigned driver vehicle fields set to `null`.
-2. **Acceptance**: Drivers must be verified, active, have sufficient seating capacity, and have an active availability window covering the complete trip with no overlapping accepted trips. Concurrency is enforced via Firestore transaction.
-3. **Cancellation**: A tourist can cancel any of their own bookings whose status is not already `Cancelled`.
-4. **Backward Compatibility**: Legacy `Confirmed` bookings remain viewable on dashboards and cannot be mutated by driver workflows.
-
----
-
 ## 8. Audit Trails & Write Safety
 
-Whenever an administrator alters driver verification or active status:
-- `verificationUpdatedAt`: Recorded via `admin.firestore.FieldValue.serverTimestamp()`.
-- `verificationUpdatedBy`: Populated strictly from the authenticated admin's session UID (`req.session.user.uid`).
-- `activeStatusUpdatedAt`: Server timestamp of active status change.
-- `activeStatusUpdatedBy`: Authenticated UID of the actor who updated active status.
-- **Strict Whitelist Updates:** Updates are applied using explicit field object mappings (`driverRef.update({...})`). Spreading raw request bodies into Firestore is strictly prohibited.
+Whenever an administrator or driver alters status:
+- `verificationUpdatedAt` / `activeStatusUpdatedAt`: Recorded via server timestamps.
+- `verificationUpdatedBy` / `activeStatusUpdatedBy`: Populated strictly from session UID.
+- `startedAt` / `completedAt` / `cancelledAt`: Authoritative server timestamps.
+- `cancelledBy`: Authoritative actor attribution (`"tourist"` vs `"driver"`).
+- `cancellationReason`: Sanitized explanation recorded on driver cancellations.
+- **Strict Whitelist Updates:** Updates are applied using explicit field object mappings. Spreading raw request bodies into Firestore is strictly prohibited.

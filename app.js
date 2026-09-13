@@ -174,14 +174,30 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getCsrfTokenFromRequest: (req) => req.body?._csrf || req.headers["x-csrf-token"],
 });
 
-// Expose user and CSRF token to all templates
-app.use((req, res, next) => {
+// Expose user, unread notification count, and CSRF token to all templates
+app.use(async (req, res, next) => {
   res.locals.user = req.session.user || null;
+  res.locals.unreadNotificationCount = 0;
   try {
     res.locals.csrfToken = generateCsrfToken(req, res);
   } catch (e) {
     res.locals.csrfToken = "";
   }
+
+  if (req.session && req.session.user && req.session.user.uid && req.method === "GET") {
+    try {
+      const snap = await db
+        .collection("notifications")
+        .where("userId", "==", req.session.user.uid)
+        .where("isRead", "==", false)
+        .limit(10)
+        .get();
+      res.locals.unreadNotificationCount = snap.size;
+    } catch (e) {
+      res.locals.unreadNotificationCount = 0;
+    }
+  }
+
   next();
 });
 
@@ -257,6 +273,22 @@ const isValidPhone = (phone) => {
 const isValidCountryCode = (code) => {
   if (!code || typeof code !== "string") return false;
   return /^\+[0-9]{1,4}$/.test(code.trim());
+};
+
+const buildNotificationRecord = (notificationId, { userId, userRole, type, title, message, link = null, relatedTripId = null }) => {
+  return {
+    notificationId,
+    userId,
+    userRole: userRole || "tourist",
+    type,
+    title: sanitizeString(title, 120),
+    message: sanitizeString(message, 500),
+    link: link ? sanitizeString(link, 200) : null,
+    relatedTripId: relatedTripId ? sanitizeString(relatedTripId, 100) : null,
+    isRead: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    readAt: null,
+  };
 };
 
 // ==========================================
@@ -432,17 +464,34 @@ app.get("/dashboard", requireTourist, async (req, res) => {
         driverId: data.driverId || null,
         driverName: data.driverName || null,
         driverPhone: data.driverPhone || null,
+        driverEmail: data.driverEmail || null,
         vanModel: data.vanModel || null,
         vanNumber: data.vanNumber || null,
         seatingCapacity: data.seatingCapacity || null,
         bookedAt: data.bookedAt
           ? (typeof data.bookedAt.toDate === "function" ? data.bookedAt.toDate().toLocaleString() : new Date(data.bookedAt).toLocaleString())
           : "N/A",
+        acceptedAt: data.acceptedAt
+          ? (typeof data.acceptedAt.toDate === "function" ? data.acceptedAt.toDate().toLocaleString() : new Date(data.acceptedAt).toLocaleString())
+          : null,
+        startedAt: data.startedAt
+          ? (typeof data.startedAt.toDate === "function" ? data.startedAt.toDate().toLocaleString() : new Date(data.startedAt).toLocaleString())
+          : null,
+        completedAt: data.completedAt
+          ? (typeof data.completedAt.toDate === "function" ? data.completedAt.toDate().toLocaleString() : new Date(data.completedAt).toLocaleString())
+          : null,
+        cancelledAt: data.cancelledAt
+          ? (typeof data.cancelledAt.toDate === "function" ? data.cancelledAt.toDate().toLocaleString() : new Date(data.cancelledAt).toLocaleString())
+          : null,
+        cancelledBy: data.cancelledBy || null,
+        cancellationReason: data.cancellationReason || null,
       });
     });
 
     res.render("dashboard", {
       bookings,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
       user: req.session.user,
     });
   } catch (err) {
@@ -607,29 +656,100 @@ app.post("/bookings", actionLimiter, async (req, res) => {
 });
 
 app.post("/cancel-booking/:id", requireTourist, actionLimiter, async (req, res) => {
+  const tripId = sanitizeString(req.params.id, 128);
+  const user = req.session.user;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
   try {
-    const bookingRef = db.collection("bookings").doc(req.params.id);
-    const booking = await bookingRef.get();
+    await db.runTransaction(async (transaction) => {
+      const bookingRef = db.collection("bookings").doc(tripId);
+      const bookingDoc = await transaction.get(bookingRef);
 
-    if (!booking.exists) {
-      return res.status(404).send("Booking not found.");
-    }
+      if (!bookingDoc.exists) {
+        const err = new Error("Booking not found.");
+        err.code = "NOT_FOUND";
+        throw err;
+      }
 
-    // Only allow the owner to cancel
-    const bData = booking.data();
-    if (bData.email !== req.session.user.email && bData.touristId !== req.session.user.uid) {
-      return res.status(403).send("Unauthorized.");
-    }
+      const bData = bookingDoc.data();
 
-    await bookingRef.update({
-      status: "Cancelled",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      // Only allow the owner to cancel (matching email or touristId)
+      if (bData.email !== user.email && bData.touristId !== user.uid) {
+        const err = new Error("Access forbidden: You can only cancel your own bookings.");
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      // Concurrency & lifecycle status checks
+      if (bData.status === "In Progress") {
+        const err = new Error("This trip is currently in progress and cannot be cancelled online.");
+        err.code = "CANNOT_CANCEL_IN_PROGRESS";
+        throw err;
+      }
+
+      if (bData.status === "Completed" || bData.status === "Cancelled") {
+        const err = new Error(`Cannot cancel trip in '${bData.status}' status.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      if (!["Requested", "Accepted", "Confirmed"].includes(bData.status)) {
+        const err = new Error(`Cannot cancel trip in '${bData.status}' status.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      transaction.update(bookingRef, {
+        status: "Cancelled",
+        cancelledBy: "tourist",
+        cancelledAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // If driver was assigned, atomically dispatch deterministic cancellation notification
+      if (bData.driverId) {
+        const notifId = `notif_${tripId}_TRIP_CANCELLED`;
+        const notifRef = db.collection("notifications").doc(notifId);
+        transaction.set(
+          notifRef,
+          buildNotificationRecord(notifId, {
+            userId: bData.driverId,
+            userRole: "driver",
+            type: "TRIP_CANCELLED",
+            title: "Trip Cancelled by Tourist",
+            message: `Tourist ${bData.name || user.name || "Passenger"} has cancelled the booking for ${bData.destination || "destination"} (${bData.fromDate || "scheduled dates"}).`,
+            link: "/driver/my-trips",
+            relatedTripId: tripId,
+          })
+        );
+      }
     });
 
-    console.log(`✅ Booking ${req.params.id} cancelled by tourist ${req.session.user.email}`);
-    res.redirect("/dashboard");
+    console.log(`✅ Booking ${tripId} cancelled by tourist ${user.email}`);
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, message: "Booking cancelled successfully." });
+    }
+
+    res.redirect("/dashboard?msg=" + encodeURIComponent("Booking cancelled successfully."));
   } catch (err) {
-    console.error("❌ Cancel error:", err.message);
+    console.error("❌ Cancel error:", err.code || err.message);
+
+    if (err.code === "FORBIDDEN") {
+      if (wantsJson) return res.status(403).json({ error: "FORBIDDEN", message: err.message });
+      return res.status(403).send("Access forbidden: You can only cancel your own bookings.");
+    }
+    if (err.code === "NOT_FOUND") {
+      if (wantsJson) return res.status(404).json({ error: "NOT_FOUND", message: err.message });
+      return res.status(404).send("Booking not found.");
+    }
+    if (err.code === "CANNOT_CANCEL_IN_PROGRESS" || err.code === "INVALID_STATE_TRANSITION") {
+      if (wantsJson) return res.status(400).json({ error: err.code, message: err.message });
+      return res.redirect("/dashboard?err=" + encodeURIComponent(err.message));
+    }
+
+    if (wantsJson) return res.status(500).json({ error: "INTERNAL_ERROR", message: "Unable to cancel booking." });
     res.status(500).send("Unable to cancel booking.");
   }
 });
@@ -819,12 +939,19 @@ app.post("/driver/login", authLimiter, async (req, res) => {
 // DATE & AVAILABILITY HELPERS
 // ==========================================
 
+const APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Colombo";
+
+const getApplicationTodayDateString = () => {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+};
+
 const getTodayDateString = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return getApplicationTodayDateString();
 };
 
 const isValidDateString = (str) => {
@@ -1428,18 +1555,20 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
         throw err;
       }
 
-      // 7. Verify driver has no overlapping Accepted trip
-      const acceptedQuery = db
+      // 7. Verify driver has no overlapping Accepted or In Progress trip
+      const activeTripsQuery = db
         .collection("bookings")
-        .where("driverId", "==", driverUid)
-        .where("status", "==", "Accepted");
-      const acceptedSnapshot = await transaction.get(acceptedQuery);
+        .where("driverId", "==", driverUid);
+      const activeSnapshot = await transaction.get(activeTripsQuery);
 
-      for (const doc of acceptedSnapshot.docs) {
+      for (const doc of activeSnapshot.docs) {
         const existingTrip = doc.data();
+        if (existingTrip.status !== "Accepted" && existingTrip.status !== "In Progress") {
+          continue;
+        }
         // Overlap condition: (newFrom <= existingTo) && (newTo >= existingFrom)
         if (trip.fromDate <= existingTrip.toDate && trip.toDate >= existingTrip.fromDate) {
-          const err = new Error("You already have an accepted trip during these dates.");
+          const err = new Error("You already have an active trip during these dates.");
           err.code = "OVERLAPPING_TRIP";
           throw err;
         }
@@ -1459,6 +1588,25 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
         acceptedAt: serverNow,
         updatedAt: serverNow,
       });
+
+      // 8b. Atomic deterministic notification for tourist
+      const touristRecipientId = trip.touristId || trip.email;
+      if (touristRecipientId) {
+        const notifId = `notif_${tripId}_TRIP_ACCEPTED`;
+        const notifRef = db.collection("notifications").doc(notifId);
+        transaction.set(
+          notifRef,
+          buildNotificationRecord(notifId, {
+            userId: touristRecipientId,
+            userRole: "tourist",
+            type: "TRIP_ACCEPTED",
+            title: "Driver Assigned!",
+            message: `Driver ${driver.name || "Driver"} has accepted your trip to ${trip.destination}. Contact details are now available on your dashboard.`,
+            link: "/dashboard",
+            relatedTripId: tripId,
+          })
+        );
+      }
     });
 
     console.log(`✅ Trip ${tripId} successfully accepted by driver ${driverUid}`);
@@ -1480,7 +1628,7 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
     if (err.code === "TRIP_ALREADY_ACCEPTED") {
       userMessage = "Sorry, this trip has already been accepted by another driver.";
     } else if (err.code === "OVERLAPPING_TRIP") {
-      userMessage = "You already have an accepted trip during these dates.";
+      userMessage = "You already have an active trip during these dates.";
     } else if (err.code === "DRIVER_INACTIVE") {
       userMessage = "Your driver account is currently inactive. Activate your profile before accepting trips.";
     } else if (err.code === "DRIVER_REJECTED") {
@@ -1508,17 +1656,393 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
 });
 
 // ==========================================
-// DRIVER MY ACCEPTED TRIPS
+// DRIVER START TRIP ENDPOINT
+// ==========================================
+
+app.post("/driver/trips/:id/start", requireDriver, actionLimiter, async (req, res) => {
+  const tripId = sanitizeString(req.params.id, 128);
+  const driverUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // 1. Read trip
+      const tripRef = db.collection("bookings").doc(tripId);
+      const tripDoc = await transaction.get(tripRef);
+
+      if (!tripDoc.exists) {
+        const err = new Error("Trip not found.");
+        err.code = "TRIP_NOT_FOUND";
+        throw err;
+      }
+
+      const trip = tripDoc.data();
+
+      // 2. Ownership check: must be assigned to caller
+      if (trip.driverId !== driverUid) {
+        const err = new Error("Access forbidden: You are not the assigned driver for this trip.");
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      // 3. Status guard: must be Accepted
+      if (trip.status !== "Accepted") {
+        const err = new Error(`Cannot start trip in status '${trip.status}'. Trip must be 'Accepted'.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      // 4. Production verification and active check
+      const driverRef = db.collection("drivers").doc(driverUid);
+      const driverDoc = await transaction.get(driverRef);
+
+      if (!driverDoc.exists) {
+        const err = new Error("Driver profile not found.");
+        err.code = "DRIVER_NOT_FOUND";
+        throw err;
+      }
+
+      const driver = driverDoc.data();
+      if (!driver.isActive) {
+        const err = new Error("Your driver account is inactive. Activate your profile before starting trips.");
+        err.code = "DRIVER_INACTIVE";
+        throw err;
+      }
+      if (driver.verificationStatus !== "verified") {
+        const err = new Error("Your driver account is pending or not verified. Only verified drivers can start trips.");
+        err.code = "DRIVER_NOT_VERIFIED";
+        throw err;
+      }
+
+      // 5. Date validation in application timezone
+      const todayStr = getApplicationTodayDateString();
+      if (todayStr < trip.fromDate) {
+        const err = new Error(`Cannot start trip before the scheduled start date (${trip.fromDate}).`);
+        err.code = "TRIP_TOO_EARLY";
+        throw err;
+      }
+      if (todayStr > trip.toDate) {
+        const err = new Error(`Cannot start trip after the scheduled end date (${trip.toDate}).`);
+        err.code = "TRIP_PAST_WINDOW";
+        throw err;
+      }
+
+      // 6. Atomic state transition
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      transaction.update(tripRef, {
+        status: "In Progress",
+        startedAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // 7. Atomic deterministic notification for tourist
+      const touristRecipientId = trip.touristId || trip.email;
+      if (touristRecipientId) {
+        const notifId = `notif_${tripId}_TRIP_STARTED`;
+        const notifRef = db.collection("notifications").doc(notifId);
+        transaction.set(
+          notifRef,
+          buildNotificationRecord(notifId, {
+            userId: touristRecipientId,
+            userRole: "tourist",
+            type: "TRIP_STARTED",
+            title: "Trip In Progress! 🚀",
+            message: `Driver ${driver.name || trip.driverName || "Driver"} has started your trip to ${trip.destination}. Safe travels!`,
+            link: "/dashboard",
+            relatedTripId: tripId,
+          })
+        );
+      }
+    });
+
+    console.log(`✅ Trip ${tripId} started by driver ${driverUid}`);
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, message: "Trip started successfully!" });
+    }
+
+    res.redirect("/driver/my-trips?msg=" + encodeURIComponent("Trip started successfully! Have a safe journey."));
+  } catch (err) {
+    console.error("❌ Start trip error:", err.code || err.message);
+
+    if (err.code === "FORBIDDEN" || err.code === "DRIVER_INACTIVE" || err.code === "DRIVER_NOT_VERIFIED") {
+      if (wantsJson) return res.status(403).json({ error: err.code, message: err.message });
+      return res.status(403).send(err.message);
+    }
+    if (err.code === "TRIP_NOT_FOUND" || err.code === "DRIVER_NOT_FOUND") {
+      if (wantsJson) return res.status(404).json({ error: err.code, message: err.message });
+      return res.status(404).send(err.message);
+    }
+    if (err.code === "TRIP_TOO_EARLY" || err.code === "TRIP_PAST_WINDOW" || err.code === "INVALID_STATE_TRANSITION") {
+      if (wantsJson) return res.status(400).json({ error: err.code, message: err.message });
+      return res.redirect("/driver/my-trips?err=" + encodeURIComponent(err.message));
+    }
+
+    if (wantsJson) return res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to start trip." });
+    res.redirect("/driver/my-trips?err=" + encodeURIComponent("Failed to start trip."));
+  }
+});
+
+// ==========================================
+// DRIVER COMPLETE TRIP ENDPOINT
+// ==========================================
+
+app.post("/driver/trips/:id/complete", requireDriver, actionLimiter, async (req, res) => {
+  const tripId = sanitizeString(req.params.id, 128);
+  const driverUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // 1. Read trip
+      const tripRef = db.collection("bookings").doc(tripId);
+      const tripDoc = await transaction.get(tripRef);
+
+      if (!tripDoc.exists) {
+        const err = new Error("Trip not found.");
+        err.code = "TRIP_NOT_FOUND";
+        throw err;
+      }
+
+      const trip = tripDoc.data();
+
+      // 2. Ownership check
+      if (trip.driverId !== driverUid) {
+        const err = new Error("Access forbidden: You are not the assigned driver for this trip.");
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      // 3. Status guard: must be In Progress
+      if (trip.status !== "In Progress") {
+        const err = new Error(`Cannot complete trip in status '${trip.status}'. Trip must be 'In Progress'.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      // 4. Authorization check
+      const driverRef = db.collection("drivers").doc(driverUid);
+      const driverDoc = await transaction.get(driverRef);
+
+      if (!driverDoc.exists) {
+        const err = new Error("Driver profile not found.");
+        err.code = "DRIVER_NOT_FOUND";
+        throw err;
+      }
+
+      const driver = driverDoc.data();
+      if (!driver.isActive) {
+        const err = new Error("Your driver account is inactive.");
+        err.code = "DRIVER_INACTIVE";
+        throw err;
+      }
+      if (driver.verificationStatus !== "verified") {
+        const err = new Error("Your driver account is not verified.");
+        err.code = "DRIVER_NOT_VERIFIED";
+        throw err;
+      }
+
+      // 5. Atomic state transition to Completed
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      transaction.update(tripRef, {
+        status: "Completed",
+        completedAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // 6. Atomic deterministic notification for tourist
+      const touristRecipientId = trip.touristId || trip.email;
+      if (touristRecipientId) {
+        const notifId = `notif_${tripId}_TRIP_COMPLETED`;
+        const notifRef = db.collection("notifications").doc(notifId);
+        transaction.set(
+          notifRef,
+          buildNotificationRecord(notifId, {
+            userId: touristRecipientId,
+            userRole: "tourist",
+            type: "TRIP_COMPLETED",
+            title: "Trip Completed! 🏁",
+            message: `Your trip to ${trip.destination} has concluded. Thank you for traveling with Destination Paradise!`,
+            link: "/dashboard",
+            relatedTripId: tripId,
+          })
+        );
+      }
+    });
+
+    console.log(`✅ Trip ${tripId} completed by driver ${driverUid}`);
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, message: "Trip completed successfully!" });
+    }
+
+    res.redirect("/driver/my-trips?msg=" + encodeURIComponent("Trip marked as completed. Great job!"));
+  } catch (err) {
+    console.error("❌ Complete trip error:", err.code || err.message);
+
+    if (err.code === "FORBIDDEN" || err.code === "DRIVER_INACTIVE" || err.code === "DRIVER_NOT_VERIFIED") {
+      if (wantsJson) return res.status(403).json({ error: err.code, message: err.message });
+      return res.status(403).send(err.message);
+    }
+    if (err.code === "TRIP_NOT_FOUND" || err.code === "DRIVER_NOT_FOUND") {
+      if (wantsJson) return res.status(404).json({ error: err.code, message: err.message });
+      return res.status(404).send(err.message);
+    }
+    if (err.code === "INVALID_STATE_TRANSITION") {
+      if (wantsJson) return res.status(400).json({ error: err.code, message: err.message });
+      return res.redirect("/driver/my-trips?err=" + encodeURIComponent(err.message));
+    }
+
+    if (wantsJson) return res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to complete trip." });
+    res.redirect("/driver/my-trips?err=" + encodeURIComponent("Failed to complete trip."));
+  }
+});
+
+// ==========================================
+// DRIVER EMERGENCY CANCEL TRIP ENDPOINT
+// ==========================================
+
+app.post("/driver/trips/:id/cancel", requireDriver, actionLimiter, async (req, res) => {
+  const tripId = sanitizeString(req.params.id, 128);
+  const driverUid = req.session.user.uid;
+  const reason = sanitizeString(req.body.reason || "", 500).trim();
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  if (!reason || reason.length < 5) {
+    if (wantsJson) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: "A valid cancellation reason (minimum 5 characters) is required." });
+    }
+    return res.redirect("/driver/my-trips?err=" + encodeURIComponent("A valid cancellation reason (minimum 5 characters) is required."));
+  }
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // 1. Read trip
+      const tripRef = db.collection("bookings").doc(tripId);
+      const tripDoc = await transaction.get(tripRef);
+
+      if (!tripDoc.exists) {
+        const err = new Error("Trip not found.");
+        err.code = "TRIP_NOT_FOUND";
+        throw err;
+      }
+
+      const trip = tripDoc.data();
+
+      // 2. Ownership check
+      if (trip.driverId !== driverUid) {
+        const err = new Error("Access forbidden: You are not the assigned driver for this trip.");
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      // 3. Status guard: must be Accepted or In Progress
+      if (!["Accepted", "In Progress"].includes(trip.status)) {
+        const err = new Error(`Cannot cancel trip in '${trip.status}' status.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      // If client explicitly specified expected status, guard against concurrent mutations
+      const fromStatus = sanitizeString(req.body.fromStatus || req.body.currentStatus || "", 30);
+      if (fromStatus && trip.status !== fromStatus) {
+        const err = new Error(`Cannot cancel trip: Expected status '${fromStatus}' but trip is currently '${trip.status}'.`);
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      // 4. Authorization check
+      const driverRef = db.collection("drivers").doc(driverUid);
+      const driverDoc = await transaction.get(driverRef);
+
+      if (!driverDoc.exists) {
+        const err = new Error("Driver profile not found.");
+        err.code = "DRIVER_NOT_FOUND";
+        throw err;
+      }
+
+      const driver = driverDoc.data();
+      if (!driver.isActive) {
+        const err = new Error("Your driver account is inactive.");
+        err.code = "DRIVER_INACTIVE";
+        throw err;
+      }
+      if (driver.verificationStatus !== "verified") {
+        const err = new Error("Your driver account is not verified.");
+        err.code = "DRIVER_NOT_VERIFIED";
+        throw err;
+      }
+
+      // 5. Atomic state transition: PRESERVE ALL DRIVER SNAPSHOT FIELDS
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      transaction.update(tripRef, {
+        status: "Cancelled",
+        cancelledBy: "driver",
+        cancellationReason: reason,
+        cancelledAt: serverNow,
+        updatedAt: serverNow,
+        // driverId, driverName, driverPhone, driverEmail, vanModel, vanNumber, seatingCapacity are strictly preserved
+      });
+
+      // 6. Atomic deterministic notification for tourist
+      const touristRecipientId = trip.touristId || trip.email;
+      if (touristRecipientId) {
+        const notifId = `notif_${tripId}_TRIP_CANCELLED`;
+        const notifRef = db.collection("notifications").doc(notifId);
+        transaction.set(
+          notifRef,
+          buildNotificationRecord(notifId, {
+            userId: touristRecipientId,
+            userRole: "tourist",
+            type: "TRIP_CANCELLED",
+            title: "Trip Cancelled by Driver",
+            message: `Driver ${driver.name || trip.driverName || "Driver"} had to cancel your trip to ${trip.destination}. Reason: ${reason}`,
+            link: "/dashboard",
+            relatedTripId: tripId,
+          })
+        );
+      }
+    });
+
+    console.log(`⚠️ Trip ${tripId} cancelled by driver ${driverUid} with reason: ${reason}`);
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, message: "Trip cancelled successfully." });
+    }
+
+    res.redirect("/driver/my-trips?msg=" + encodeURIComponent("Trip has been cancelled."));
+  } catch (err) {
+    console.error("❌ Driver cancel trip error:", err.code || err.message);
+
+    if (err.code === "FORBIDDEN" || err.code === "DRIVER_INACTIVE" || err.code === "DRIVER_NOT_VERIFIED") {
+      if (wantsJson) return res.status(403).json({ error: err.code, message: err.message });
+      return res.status(403).send(err.message);
+    }
+    if (err.code === "TRIP_NOT_FOUND" || err.code === "DRIVER_NOT_FOUND") {
+      if (wantsJson) return res.status(404).json({ error: err.code, message: err.message });
+      return res.status(404).send(err.message);
+    }
+    if (err.code === "INVALID_STATE_TRANSITION") {
+      if (wantsJson) return res.status(400).json({ error: err.code, message: err.message });
+      return res.redirect("/driver/my-trips?err=" + encodeURIComponent(err.message));
+    }
+
+    if (wantsJson) return res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to cancel trip." });
+    res.redirect("/driver/my-trips?err=" + encodeURIComponent("Failed to cancel trip."));
+  }
+});
+
+// ==========================================
+// DRIVER MY ACCEPTED & ACTIVE TRIPS
 // ==========================================
 
 app.get("/driver/my-trips", requireDriver, async (req, res) => {
   try {
-    const todayStr = getTodayDateString();
+    const todayStr = getApplicationTodayDateString();
 
     const tripsSnapshot = await db
       .collection("bookings")
       .where("driverId", "==", req.session.user.uid)
-      .where("status", "==", "Accepted")
       .get();
 
     const myTrips = [];
@@ -1529,19 +2053,30 @@ app.get("/driver/my-trips", requireDriver, async (req, res) => {
       });
     });
 
-    // Upcoming: toDate >= todayStr (sorted by fromDate asc)
+    // In Progress: status === "In Progress"
+    const inProgressTrips = myTrips.filter((t) => t.status === "In Progress");
+
+    // Upcoming: status === "Accepted" (sorted by fromDate asc)
     const upcomingTrips = myTrips
-      .filter((t) => (t.toDate || "") >= todayStr)
+      .filter((t) => t.status === "Accepted")
       .sort((a, b) => (a.fromDate || "").localeCompare(b.fromDate || ""));
 
-    // Past: toDate < todayStr (sorted by toDate desc)
-    const pastTrips = myTrips
-      .filter((t) => (t.toDate || "") < todayStr)
+    // Completed: status === "Completed" (sorted by toDate desc)
+    const completedTrips = myTrips
+      .filter((t) => t.status === "Completed")
+      .sort((a, b) => (b.toDate || "").localeCompare(a.toDate || ""));
+
+    // Cancelled: status === "Cancelled" (sorted by toDate desc)
+    const cancelledTrips = myTrips
+      .filter((t) => t.status === "Cancelled")
       .sort((a, b) => (b.toDate || "").localeCompare(a.toDate || ""));
 
     res.render("driver-my-trips", {
+      inProgressTrips,
       upcomingTrips,
-      pastTrips,
+      completedTrips,
+      cancelledTrips,
+      todayStr,
       successMessage: req.query.msg || null,
       errorMessage: req.query.err || null,
       user: req.session.user,
@@ -1749,12 +2284,30 @@ app.post("/admin/drivers/:id/verify", requireAdmin, actionLimiter, async (req, r
     }
 
     const serverNow = admin.firestore.FieldValue.serverTimestamp();
-    await driverRef.update({
+    const batch = db.batch();
+
+    batch.update(driverRef, {
       verificationStatus: "verified",
       verificationUpdatedAt: serverNow,
       verificationUpdatedBy: adminUid,
       updatedAt: serverNow,
     });
+
+    const notifId = `notif_${driverId}_DRIVER_VERIFIED`;
+    const notifRef = db.collection("notifications").doc(notifId);
+    batch.set(
+      notifRef,
+      buildNotificationRecord(notifId, {
+        userId: driverId,
+        userRole: "driver",
+        type: "DRIVER_VERIFIED",
+        title: "Account Verified! 🎉",
+        message: "Congratulations! Your driver account has been reviewed and verified by administration. You can now receive and accept trip requests in the marketplace.",
+        link: "/driver/trips",
+      })
+    );
+
+    await batch.commit();
 
     console.log(`✅ Admin ${adminUid} verified driver ${driverId}`);
     res.redirect(`/admin/drivers/${driverId}?msg=` + encodeURIComponent("Driver has been approved and verified successfully."));
@@ -1777,12 +2330,30 @@ app.post("/admin/drivers/:id/reject", requireAdmin, actionLimiter, async (req, r
     }
 
     const serverNow = admin.firestore.FieldValue.serverTimestamp();
-    await driverRef.update({
+    const batch = db.batch();
+
+    batch.update(driverRef, {
       verificationStatus: "rejected",
       verificationUpdatedAt: serverNow,
       verificationUpdatedBy: adminUid,
       updatedAt: serverNow,
     });
+
+    const notifId = `notif_${driverId}_DRIVER_REJECTED`;
+    const notifRef = db.collection("notifications").doc(notifId);
+    batch.set(
+      notifRef,
+      buildNotificationRecord(notifId, {
+        userId: driverId,
+        userRole: "driver",
+        type: "DRIVER_REJECTED",
+        title: "Verification Update",
+        message: "Your driver registration application has been reviewed and was not approved by platform administration.",
+        link: "/driver/dashboard",
+      })
+    );
+
+    await batch.commit();
 
     console.log(`⚠️ Admin ${adminUid} rejected driver ${driverId}`);
     res.redirect(`/admin/drivers/${driverId}?msg=` + encodeURIComponent("Driver verification has been rejected."));
@@ -1888,6 +2459,145 @@ app.get("/admin/users", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("❌ Admin users directory error:", err.message);
     res.status(500).send("Unable to load user accounts.");
+  }
+});
+
+// ==========================================
+// IN-APP NOTIFICATIONS ROUTES
+// ==========================================
+
+app.get("/notifications", requireAuth, async (req, res) => {
+  const userUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    const snap = await db
+      .collection("notifications")
+      .where("userId", "==", userUid)
+      .get();
+
+    const notifications = [];
+    let unreadCount = 0;
+
+    snap.forEach((doc) => {
+      const data = doc.data();
+      if (!data.isRead) unreadCount++;
+      notifications.push({
+        id: doc.id,
+        ...data,
+      });
+    });
+
+    // In-memory sort by createdAt desc (avoids compound index requirement)
+    notifications.sort((a, b) => {
+      const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+      const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    // Format timestamps for display
+    notifications.forEach((n) => {
+      n.createdAtFormatted = n.createdAt?.toDate
+        ? n.createdAt.toDate().toLocaleString()
+        : (n.createdAt ? new Date(n.createdAt).toLocaleString() : "Recently");
+    });
+
+    if (wantsJson) {
+      return res.status(200).json({ notifications, unreadCount });
+    }
+
+    res.render("notifications", {
+      notifications,
+      unreadCount,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Notifications load error:", err.message);
+    if (wantsJson) {
+      return res.status(500).json({ error: "LOAD_FAILED", message: "Failed to load notifications." });
+    }
+    res.status(500).send("Unable to load notifications.");
+  }
+});
+
+app.post("/notifications/:id/read", requireAuth, actionLimiter, async (req, res) => {
+  const notifId = sanitizeString(req.params.id, 128);
+  const userUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    const notifRef = db.collection("notifications").doc(notifId);
+    const notifDoc = await notifRef.get();
+
+    if (!notifDoc.exists) {
+      if (wantsJson) return res.status(404).json({ error: "NOT_FOUND", message: "Notification not found." });
+      return res.status(404).send("Notification not found.");
+    }
+
+    const notifData = notifDoc.data();
+
+    // Security: Only the recipient can mark as read
+    if (notifData.userId !== userUid) {
+      if (wantsJson) return res.status(403).json({ error: "FORBIDDEN", message: "Unauthorized." });
+      return res.status(403).send("Unauthorized.");
+    }
+
+    await notifRef.update({
+      isRead: true,
+      readAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, notificationId: notifId });
+    }
+
+    res.redirect("/notifications");
+  } catch (err) {
+    console.error("❌ Notification mark read error:", err.message);
+    if (wantsJson) {
+      return res.status(500).json({ error: "UPDATE_FAILED", message: "Failed to mark notification as read." });
+    }
+    res.redirect("/notifications");
+  }
+});
+
+app.post("/notifications/mark-all-read", requireAuth, actionLimiter, async (req, res) => {
+  // SECURITY: Exclusively derive userId from session. Never accept from req.body or query!
+  const userUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    const unreadSnap = await db
+      .collection("notifications")
+      .where("userId", "==", userUid)
+      .where("isRead", "==", false)
+      .get();
+
+    if (!unreadSnap.empty) {
+      const batch = db.batch();
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      unreadSnap.forEach((doc) => {
+        batch.update(doc.ref, {
+          isRead: true,
+          readAt: serverNow,
+        });
+      });
+      await batch.commit();
+    }
+
+    if (wantsJson) {
+      return res.status(200).json({ success: true, count: unreadSnap.size });
+    }
+
+    res.redirect("/notifications?msg=" + encodeURIComponent("All notifications marked as read."));
+  } catch (err) {
+    console.error("❌ Mark all read error:", err.message);
+    if (wantsJson) {
+      return res.status(500).json({ error: "UPDATE_FAILED", message: "Failed to mark all as read." });
+    }
+    res.redirect("/notifications?err=" + encodeURIComponent("Failed to mark all as read."));
   }
 });
 

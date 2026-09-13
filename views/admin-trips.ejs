@@ -11,7 +11,7 @@
         <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
           Platform Trips Monitor
         </h1>
-        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; margin-bottom: 0;">
           Read-only operational tracking of tourist trip requests, driver assignments, and booking lifecycles.
         </p>
       </div>
@@ -32,6 +32,12 @@
         </a>
         <a href="/admin/trips?status=Accepted" class="btn <%= currentFilter === 'Accepted' ? 'btn-primary' : 'btn-outline' %> btn-sm">
           🟢 Driver Assigned
+        </a>
+        <a href="/admin/trips?status=In Progress" class="btn <%= currentFilter && currentFilter.toLowerCase() === 'in progress' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          🔵 In Progress
+        </a>
+        <a href="/admin/trips?status=Completed" class="btn <%= currentFilter && currentFilter.toLowerCase() === 'completed' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          ✅ Completed
         </a>
         <a href="/admin/trips?status=Confirmed" class="btn <%= currentFilter === 'Confirmed' ? 'btn-primary' : 'btn-outline' %> btn-sm">
           ✓ Confirmed (Legacy)
@@ -63,12 +69,18 @@
                 <th>Party</th>
                 <th>Trip Status</th>
                 <th>Assigned Driver</th>
-                <th>Submitted</th>
+                <th>Milestones & Timestamps</th>
               </tr>
             </thead>
             <tbody>
               <% trips.forEach((t) => { %>
-                <% const bookedDate = t.bookedAt ? (typeof t.bookedAt.toDate === 'function' ? t.bookedAt.toDate().toLocaleDateString() : new Date(t.bookedAt).toLocaleDateString()) : 'N/A'; %>
+                <% 
+                  const bookedDate = t.bookedAt ? (typeof t.bookedAt.toDate === 'function' ? t.bookedAt.toDate().toLocaleDateString() : new Date(t.bookedAt).toLocaleDateString()) : 'N/A';
+                  const acceptedDate = t.acceptedAt ? (typeof t.acceptedAt.toDate === 'function' ? t.acceptedAt.toDate().toLocaleDateString() : new Date(t.acceptedAt).toLocaleDateString()) : null;
+                  const startedDate = t.startedAt ? (typeof t.startedAt.toDate === 'function' ? t.startedAt.toDate().toLocaleDateString() : new Date(t.startedAt).toLocaleDateString()) : null;
+                  const completedDate = t.completedAt ? (typeof t.completedAt.toDate === 'function' ? t.completedAt.toDate().toLocaleDateString() : new Date(t.completedAt).toLocaleDateString()) : null;
+                  const cancelledDate = t.cancelledAt ? (typeof t.cancelledAt.toDate === 'function' ? t.cancelledAt.toDate().toLocaleDateString() : new Date(t.cancelledAt).toLocaleDateString()) : null;
+                %>
                 <tr>
                   <td>
                     <div style="font-weight: 700; color: var(--primary-900); font-size: 1rem;">🌴 <%= t.destination %></div>
@@ -85,6 +97,10 @@
                   <td>
                     <% if (t.status === 'Accepted') { %>
                       <span class="badge badge-active">🟢 Driver Assigned</span>
+                    <% } else if (t.status === 'In Progress') { %>
+                      <span class="badge" style="background: #dbeafe; color: #1e40af;">🚀 In Progress</span>
+                    <% } else if (t.status === 'Completed') { %>
+                      <span class="badge" style="background: #dcfce7; color: #15803d;">✅ Completed</span>
                     <% } else if (t.status === 'Cancelled') { %>
                       <span class="badge badge-inactive">✕ Cancelled</span>
                     <% } else if (t.status === 'Confirmed') { %>
@@ -102,8 +118,12 @@
                       <span style="color: var(--text-muted); font-style: italic; font-size: 0.88rem;">None (Open Request)</span>
                     <% } %>
                   </td>
-                  <td style="font-size: 0.85rem; color: var(--text-muted);">
-                    <%= bookedDate %>
+                  <td style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                    <div><strong>Submitted:</strong> <%= bookedDate %></div>
+                    <% if (acceptedDate) { %><div><strong>Accepted:</strong> <%= acceptedDate %></div><% } %>
+                    <% if (startedDate) { %><div><strong>Started:</strong> <%= startedDate %></div><% } %>
+                    <% if (completedDate) { %><div><strong>Completed:</strong> <%= completedDate %></div><% } %>
+                    <% if (cancelledDate) { %><div><strong>Cancelled:</strong> <%= cancelledDate %> (<%= t.cancelledBy || 'system' %>)</div><% } %>
                   </td>
                 </tr>
               <% }) %>
@@ -116,4 +136,3 @@
 </main>
 
 <%- include('partials/footer') %>
-

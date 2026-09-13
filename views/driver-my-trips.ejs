@@ -1,4 +1,4 @@
-<%- include('partials/head', { title: 'My Accepted Trips' }) %>
+<%- include('partials/head', { title: 'My Trip Schedule' }) %>
 <%- include('partials/navbar', { activePage: 'my-trips' }) %>
 
 <main style="padding: 2.5rem 0 4rem;">
@@ -8,35 +8,138 @@
     <!-- PAGE HEADER -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
       <div>
-        <h1 style="font-size: 1.85rem; color: var(--primary-900);">
-          My Accepted Trips
+        <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
+          My Trip Schedule
         </h1>
-        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
-          Track your active tourist assignments, coordinate with travelers, and review past completed journeys.
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px; margin-bottom: 0;">
+          Track your assigned tourist journeys, launch scheduled trips, complete journeys, and view your trip history.
         </p>
       </div>
 
       <a href="/driver/trips" class="btn btn-primary btn-sm">
-        + Browse Trip Requests
+        + Browse Open Trips
       </a>
     </div>
 
-    <!-- UPCOMING TRIPS SECTION -->
+    <!-- 1. ACTIVE TRIPS (IN PROGRESS) -->
+    <% if (typeof inProgressTrips !== 'undefined' && inProgressTrips.length > 0) { %>
+      <div style="margin-bottom: 2.5rem;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;">
+          <h2 style="font-size: 1.35rem; color: var(--primary-900); margin: 0;">
+            🚀 Active Trip (En Route)
+          </h2>
+          <span class="badge" style="background: #dbeafe; color: #1e40af; font-size: 0.85rem; padding: 4px 10px;">
+            <%= inProgressTrips.length %> In Progress
+          </span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          <% inProgressTrips.forEach((trip) => { %>
+            <% 
+              const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
+              const waDigits = cleanPhone.replace(/[^0-9]/g, '');
+              const startedDateStr = trip.startedAt ? (typeof trip.startedAt.toDate === 'function' ? trip.startedAt.toDate().toLocaleString() : new Date(trip.startedAt).toLocaleString()) : 'Today';
+            %>
+            <div class="card" style="border: 2px solid #3b82f6; background: linear-gradient(to bottom, #ffffff, #f0f9ff); padding: 1.75rem;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                <div>
+                  <span class="badge" style="background: #3b82f6; color: #fff; font-size: 0.8rem; margin-bottom: 6px;">
+                    CURRENTLY ON THE ROAD
+                  </span>
+                  <h3 style="font-size: 1.5rem; color: var(--primary-900); margin: 4px 0 0 0;">
+                    🌴 <%= trip.destination %>
+                  </h3>
+                </div>
+
+                <div style="text-align: right;">
+                  <div style="font-size: 0.85rem; color: var(--text-muted);">Trip Started</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary-900);"><%= startedDateStr %></div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: #ffffff; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <div>
+                  <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Scheduled Dates</div>
+                  <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);"><%= trip.fromDate %> &rarr; <%= trip.toDate %></div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Passengers</div>
+                  <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);"><%= trip.people %> Travelers</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Passenger Contact</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary-900);"><%= trip.name %></div>
+                  <div style="font-size: 0.88rem; color: var(--text-secondary);"><%= trip.countryCode %> <%= trip.phone %></div>
+                </div>
+              </div>
+
+              <!-- ACTIONS: COMPLETE TRIP & EMERGENCY CANCEL -->
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+                <div style="display: flex; gap: 10px;">
+                  <a href="tel:<%= cleanPhone %>" class="btn btn-outline btn-sm">
+                    📞 Call Passenger
+                  </a>
+                  <% if (waDigits) { %>
+                    <a href="https://wa.me/<%= waDigits %>" target="_blank" class="btn btn-teal btn-sm">
+                      💬 WhatsApp
+                    </a>
+                  <% } %>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <button type="button" class="btn btn-outline btn-sm" style="color: #dc2626; border-color: #fca5a5;" onclick="toggleCancelModal('<%= trip.id %>')">
+                    Emergency Cancel
+                  </button>
+
+                  <form action="/driver/trips/<%= trip.id %>/complete" method="POST" onsubmit="return confirm('Have you concluded this trip and dropped off the passengers safely?');" style="margin: 0;">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-primary btn-sm" style="background: #16a34a; border-color: #16a34a;">
+                      ✓ Mark Trip Completed
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <!-- EMERGENCY CANCEL FORM ACCORDION -->
+              <div id="cancel-box-<%= trip.id %>" style="display: none; margin-top: 1.25rem; background: #fff1f2; border: 1px solid #fecdd3; padding: 1rem; border-radius: var(--radius-sm);">
+                <h4 style="font-size: 0.95rem; color: #9f1239; margin: 0 0 6px 0;">Emergency Trip Cancellation</h4>
+                <p style="font-size: 0.85rem; color: #881337; margin-bottom: 10px;">
+                  Cancelling an in-progress trip must only be done in extreme emergencies (e.g. vehicle breakdown, medical emergency). The passenger and platform administration will be notified.
+                </p>
+                <form action="/driver/trips/<%= trip.id %>/cancel" method="POST">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="fromStatus" value="In Progress">
+                  <div style="margin-bottom: 10px;">
+                    <textarea name="reason" rows="2" minlength="5" maxlength="500" required placeholder="Provide reason for emergency cancellation (minimum 5 characters)..." class="form-control" style="width: 100%; font-size: 0.88rem;"></textarea>
+                  </div>
+                  <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="toggleCancelModal('<%= trip.id %>')">Dismiss</button>
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this in-progress trip?');">Confirm Emergency Cancellation</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- 2. UPCOMING ACCEPTED TRIPS -->
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;">
       <h2 style="font-size: 1.35rem; color: var(--primary-900); margin: 0;">
-        🗓️ Upcoming & Active Trips
+        🗓️ Upcoming Accepted Trips
       </h2>
       <span class="badge badge-active">
-        <%= upcomingTrips.length %> Active
+        <%= typeof upcomingTrips !== 'undefined' ? upcomingTrips.length : 0 %> Scheduled
       </span>
     </div>
 
-    <% if (upcomingTrips.length === 0) { %>
+    <% if (typeof upcomingTrips === 'undefined' || upcomingTrips.length === 0) { %>
       <div class="empty-state" style="margin-bottom: 3rem;">
         <div class="empty-state-icon">🏖️</div>
         <h3 class="empty-state-title">No Upcoming Trips Scheduled</h3>
         <p class="empty-state-desc">
-          You have not accepted any upcoming tourist trips yet. Explore the marketplace to find travel requests matching your schedule.
+          You do not have any upcoming tourist assignments. Explore open trip requests in the marketplace to schedule your upcoming dates.
         </p>
         <a href="/driver/trips" class="btn btn-secondary">
           Browse Open Trip Requests &rarr;
@@ -49,6 +152,9 @@
             const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
             const waDigits = cleanPhone.replace(/[^0-9]/g, '');
             const acceptedDateStr = trip.acceptedAt ? (typeof trip.acceptedAt.toDate === 'function' ? trip.acceptedAt.toDate().toLocaleDateString() : new Date(trip.acceptedAt).toLocaleDateString()) : 'Recently';
+            const isWindowOpen = (typeof todayStr !== 'undefined') && (todayStr >= trip.fromDate && todayStr <= trip.toDate);
+            const isEarly = (typeof todayStr !== 'undefined') && (todayStr < trip.fromDate);
+            const isPast = (typeof todayStr !== 'undefined') && (todayStr > trip.toDate);
           %>
           <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--teal-600);">
             <div>
@@ -56,7 +162,7 @@
                 <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 0;">
                   🌴 <%= trip.destination %>
                 </h3>
-                <span class="badge badge-active">🟢 Accepted & Confirmed</span>
+                <span class="badge badge-active">🟢 Accepted</span>
               </div>
 
               <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem;">
@@ -71,7 +177,7 @@
               <!-- TOURIST CONTACT CARD -->
               <div style="background: var(--bg-alt); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; border-left: 3px solid var(--teal-600);">
                 <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
-                  Tourist Details
+                  Passenger Details
                 </div>
                 <div style="font-size: 1rem; font-weight: 700; color: var(--primary-900); margin-bottom: 4px;">
                   <%= trip.name %>
@@ -86,96 +192,164 @@
               </div>
             </div>
 
-            <!-- DIRECT CONTACT ACTIONS -->
-            <div style="display: flex; gap: 10px;">
-              <a href="tel:<%= trip.countryCode %><%= trip.phone %>" class="btn btn-outline btn-sm" style="flex: 1; text-align: center;">
-                📞 Call Tourist
-              </a>
-              <% if (waDigits) { %>
-                <a href="https://wa.me/<%= waDigits %>?text=Hello%20<%= encodeURIComponent(trip.name) %>,%20I%20am%20your%20assigned%20van%20driver%20on%20Destination%20Paradise%20for%20your%20trip%20to%20<%= encodeURIComponent(trip.destination) %>." target="_blank" class="btn btn-teal btn-sm" style="flex: 1; text-align: center;">
-                  💬 WhatsApp
+            <!-- LIFECYCLE ACTION CONTROLS -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <a href="tel:<%= cleanPhone %>" class="btn btn-outline btn-sm" style="flex: 1; text-align: center;">
+                  📞 Call
                 </a>
-              <% } %>
+                <% if (waDigits) { %>
+                  <a href="https://wa.me/<%= waDigits %>" target="_blank" class="btn btn-teal btn-sm" style="flex: 1; text-align: center;">
+                    💬 WhatsApp
+                  </a>
+                <% } %>
+              </div>
+
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <% if (isWindowOpen) { %>
+                  <form action="/driver/trips/<%= trip.id %>/start" method="POST" style="flex: 2; margin: 0;">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">
+                      Start Trip 🚀
+                    </button>
+                  </form>
+                <% } else if (isEarly) { %>
+                  <div style="flex: 2; text-align: center; font-size: 0.8rem; background: var(--bg-alt); padding: 6px 8px; border-radius: var(--radius-sm); color: var(--text-muted);">
+                    ⏳ Starts on <%= trip.fromDate %>
+                  </div>
+                <% } else if (isPast) { %>
+                  <div style="flex: 2; text-align: center; font-size: 0.8rem; background: #fef2f2; padding: 6px 8px; border-radius: var(--radius-sm); color: #dc2626;">
+                    ⚠️ Scheduled window passed
+                  </div>
+                <% } %>
+
+                <button type="button" class="btn btn-outline btn-sm" style="flex: 1; color: #dc2626; border-color: #fca5a5;" onclick="toggleCancelModal('<%= trip.id %>')">
+                  Cancel
+                </button>
+              </div>
+
+              <!-- CANCEL FORM ACCORDION -->
+              <div id="cancel-box-<%= trip.id %>" style="display: none; margin-top: 10px; background: #fff1f2; border: 1px solid #fecdd3; padding: 10px; border-radius: var(--radius-sm);">
+                <form action="/driver/trips/<%= trip.id %>/cancel" method="POST">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="fromStatus" value="Accepted">
+                  <div style="font-size: 0.8rem; color: #9f1239; margin-bottom: 6px;">Reason for cancellation (min 5 chars):</div>
+                  <textarea name="reason" rows="2" minlength="5" maxlength="500" required placeholder="Vehicle issue, illness, etc." class="form-control" style="width: 100%; font-size: 0.82rem; margin-bottom: 8px;"></textarea>
+                  <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="toggleCancelModal('<%= trip.id %>')">Close</button>
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Cancel this accepted trip?');">Submit Cancel</button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-        <% }) %>
+        <% }); %>
       </div>
     <% } %>
 
-    <!-- PAST TRIPS SECTION -->
+    <!-- 3. COMPLETED JOURNEYS -->
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;">
       <h2 style="font-size: 1.35rem; color: var(--primary-900); margin: 0;">
-        📁 Concluded & Past Trips
+        ✅ Completed Journeys
       </h2>
-      <span class="badge badge-inactive">
-        <%= pastTrips.length %> Past
+      <span class="badge" style="background: #f0fdf4; color: #166534; font-size: 0.85rem; padding: 4px 10px;">
+        <%= typeof completedTrips !== 'undefined' ? completedTrips.length : 0 %> Finished
       </span>
     </div>
 
-    <% if (pastTrips.length === 0) { %>
-      <div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">
-        <p style="margin: 0;">No completed or historical trips recorded yet.</p>
+    <% if (typeof completedTrips === 'undefined' || completedTrips.length === 0) { %>
+      <div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted); margin-bottom: 3rem;">
+        No completed journeys yet. Once you complete assigned trips, they will be archived here.
       </div>
     <% } else { %>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
-        <% pastTrips.forEach((trip) => { %>
-          <% 
-            const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
-            const waDigits = cleanPhone.replace(/[^0-9]/g, '');
-            const acceptedDateStr = trip.acceptedAt ? (typeof trip.acceptedAt.toDate === 'function' ? trip.acceptedAt.toDate().toLocaleDateString() : new Date(trip.acceptedAt).toLocaleDateString()) : 'N/A';
-          %>
-          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; opacity: 0.9; background: #fafbfc;">
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 1rem;">
-                <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 0;">
-                  🌴 <%= trip.destination %>
-                </h3>
-                <span class="badge badge-inactive">Concluded</span>
-              </div>
-
-              <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem;">
-                <div style="font-size: 0.95rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-                  <span>📅</span> <%= trip.fromDate %> &rarr; <%= trip.toDate %>
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
-                  <span>👥</span> <%= trip.people %> Passenger<%= trip.people === 1 ? '' : 's' %>
-                </div>
-              </div>
-
-              <!-- TOURIST DETAILS -->
-              <div style="background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; border-left: 3px solid var(--border-subtle);">
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;">
-                  Tourist Details
-                </div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--primary-900); margin-bottom: 4px;">
-                  <%= trip.name %>
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  <span>📞</span> <%= trip.countryCode %> <%= trip.phone %>
-                </div>
-              </div>
-
-              <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-                Accepted on: <%= acceptedDateStr %>
-              </div>
-            </div>
-
-            <!-- CONTACT ACTIONS -->
-            <div style="display: flex; gap: 10px;">
-              <a href="tel:<%= trip.countryCode %><%= trip.phone %>" class="btn btn-outline btn-sm" style="flex: 1; text-align: center;">
-                📞 Call
-              </a>
-              <% if (waDigits) { %>
-                <a href="https://wa.me/<%= waDigits %>" target="_blank" class="btn btn-outline btn-sm" style="flex: 1; text-align: center;">
-                  💬 WhatsApp
-                </a>
-              <% } %>
-            </div>
-          </div>
-        <% }) %>
+      <div class="card" style="margin-bottom: 3rem;">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Destination</th>
+                <th>Dates</th>
+                <th>Passengers</th>
+                <th>Lead Traveler</th>
+                <th>Completed At</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% completedTrips.forEach((trip) => { %>
+                <% const compStr = trip.completedAt ? (typeof trip.completedAt.toDate === 'function' ? trip.completedAt.toDate().toLocaleString() : new Date(trip.completedAt).toLocaleString()) : 'Concluded'; %>
+                <tr>
+                  <td style="font-weight: 700; color: var(--primary-900);">🌴 <%= trip.destination %></td>
+                  <td style="white-space: nowrap;"><%= trip.fromDate %> &rarr; <%= trip.toDate %></td>
+                  <td><%= trip.people %> Person<%= trip.people === 1 ? '' : 's' %></td>
+                  <td><%= trip.name %> (<%= trip.countryCode %> <%= trip.phone %>)</td>
+                  <td style="font-size: 0.85rem; color: var(--text-muted);"><%= compStr %></td>
+                  <td>
+                    <span class="badge" style="background: #dcfce7; color: #15803d;">✓ Completed</span>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       </div>
     <% } %>
+
+    <!-- 4. CANCELLED ASSIGNMENTS -->
+    <% if (typeof cancelledTrips !== 'undefined' && cancelledTrips.length > 0) { %>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.35rem; color: var(--primary-900); margin: 0;">
+          ✖️ Cancelled Assignments
+        </h2>
+        <span class="badge" style="background: #fef2f2; color: #991b1b; font-size: 0.85rem; padding: 4px 10px;">
+          <%= cancelledTrips.length %> Cancelled
+        </span>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Destination</th>
+                <th>Dates</th>
+                <th>Passenger</th>
+                <th>Cancelled By</th>
+                <th>Reason</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% cancelledTrips.forEach((trip) => { %>
+                <tr>
+                  <td style="font-weight: 700; color: var(--primary-900);">🌴 <%= trip.destination %></td>
+                  <td style="white-space: nowrap;"><%= trip.fromDate %> &rarr; <%= trip.toDate %></td>
+                  <td><%= trip.name %></td>
+                  <td><strong style="text-transform: capitalize;"><%= trip.cancelledBy || 'system' %></strong></td>
+                  <td style="font-size: 0.88rem; color: var(--text-muted); max-width: 260px;">
+                    <%= trip.cancellationReason || 'N/A' %>
+                  </td>
+                  <td>
+                    <span class="badge" style="background: #fee2e2; color: #991b1b;">Cancelled</span>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+
   </div>
 </main>
+
+<script>
+function toggleCancelModal(id) {
+  const box = document.getElementById('cancel-box-' + id);
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+}
+</script>
 
 <%- include('partials/footer') %>

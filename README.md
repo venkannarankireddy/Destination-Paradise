@@ -1,6 +1,6 @@
 # Destination Paradise 🌴
 
-A production-grade, two-sided travel marketplace connecting travelers with verified van drivers for regional and long-distance tourist journeys. Destination Paradise operates on a direct communication model (zero commission, no in-app payment handling) with administrative governance, role-based authorization, date-based availability scheduling, and transactional concurrency protection.
+A production-grade, two-sided travel marketplace connecting travelers with verified van drivers for regional and long-distance tourist journeys. Destination Paradise operates on a direct communication model (zero commission, no in-app payment handling) with administrative governance, role-based authorization, date-based availability scheduling, transactional concurrency protection, a deterministic **Trip Lifecycle State Machine**, and an **In-App Notification Engine**.
 
 ---
 
@@ -9,18 +9,29 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 ### 👤 Tourist Experience
 - **Authentication:** Secure traveler registration and login with session fixation protection.
 - **Trip Requests:** Submit structured trip requests with destination, date range, party size (1–20), and contact details.
-- **Tourist Dashboard:** Track real-time trip request statuses (`Looking for Driver`, `Driver Assigned`, `Cancelled`, `Confirmed`).
+- **Tourist Dashboard & Progress Stepper:** Track real-time trip progress through the complete lifecycle stepper (`Requested` $\to$ `Driver Accepted` $\to$ `In Progress` $\to$ `Completed`).
 - **Direct Driver Access:** View assigned driver's verified profile, vehicle specifications, license plate, phone number, and direct call (`tel:`) or WhatsApp launchers.
-- **Self-Service Cancellation:** Cancel pending or accepted trip requests directly from the dashboard.
+- **Controlled Cancellation:** Cancel open requests or pre-trip accepted assignments with automatic driver schedule unblocking and notification.
+- **In-App Notifications:** Real-time updates with navbar bell badge alert for driver assignment, trip start, and completion.
 
 ### 🚐 Van Driver Experience
 - **Driver Portal:** Dedicated driver registration capturing driving experience, license number, vehicle model, plate number, and seating capacity (4–20).
 - **Driver Availability Management:** Schedule, update, toggle, and delete date-based availability windows with automated overlap prevention.
 - **Trip Marketplace:** Discover tourist trip requests matching vehicle capacity and scheduled availability windows.
 - **Verification Requirement:** Production marketplace matching and trip acceptance strictly require `verificationStatus === "verified"` and `isActive === true`.
-- **Direct Tourist Communication:** Call or message travelers directly to discuss itinerary, baggage space, and mutually agreed compensation before accepting.
-- **Transactional Acceptance:** Atomically accept trip requests with concurrency locking, availability coverage checks, and overlapping accepted trip prevention.
-- **Trip Schedule:** Segmented view of upcoming active trips and historical journeys.
+- **Direct Tourist Communication:** Call or message travelers directly to coordinate trip logistics and agree on pricing before accepting.
+- **Transactional Acceptance:** Atomically accept trip requests with concurrency locking, availability coverage checks, and overlapping active trip prevention.
+- **Trip Lifecycle Operations:**
+  - **Start Trip (`/start`):** Validates scheduled travel date window (`fromDate <= today <= toDate` in `APP_TIMEZONE`) and launches trip to `"In Progress"`.
+  - **Complete Trip (`/complete`):** Marks journey as `"Completed"`, logs completion timestamp, and releases driver calendar for future bookings.
+  - **Emergency Cancellation (`/cancel`):** Enables withdrawal during emergencies with mandatory explanation ($\ge 5$ chars) while preserving historical vehicle and driver snapshot details.
+- **Segmented My-Trips Schedule:** Distinct operational sections for active in-progress trips, upcoming accepted journeys, completed archives, and cancelled assignments.
+
+### 🔔 In-App Notification System (Phase 9)
+- **Zero Third-Party Dependency:** Operates securely within Firestore without external SMS, email, or WhatsApp dependencies.
+- **Deterministic Document IDs:** Prevents duplicate notifications on transaction retries or duplicate user clicks.
+- **Universal Navbar Bell:** Dynamic unread badge counter in header navigation.
+- **Notification Feed (`/notifications`):** Interactive feed with unread filtering, individual mark-read, and secure bulk "Mark All as Read" strictly scoped to the authenticated session UID.
 
 ### 🛡️ Administrative Governance (Phase 8)
 - **Role-Based Admin Access:** Server-enforced authorization (`requireAdmin`) on all `/admin*` routes. Tourists and drivers receive 403 Forbidden.
@@ -29,11 +40,11 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
   node scripts/make-admin.js <email>
   ```
 - **Driver Verification Workflow:** Admin review page (`/admin/drivers/:id`) for reviewing personal information, driver license, driving experience, and vehicle capacity:
-  - **Approve Driver:** Updates `verificationStatus: "verified"` and records admin UID audit metadata.
-  - **Reject Driver:** Updates `verificationStatus: "rejected"` with confirmation modal without destroying account records.
+  - **Approve Driver:** Updates `verificationStatus: "verified"` and atomically dispatches in-app notification.
+  - **Reject Driver:** Updates `verificationStatus: "rejected"` and atomically dispatches in-app notification.
 - **Active Status Governance:** Admin can pause or reactivate drivers via modal confirmation while preserving verification status.
-- **Platform Monitoring:** Read-only tracking of all platform trips (`/admin/trips`) and registered users (`/admin/users`).
-- **Audit Trails:** Automatic tracking of `verificationUpdatedAt`, `verificationUpdatedBy`, `activeStatusUpdatedAt`, and `activeStatusUpdatedBy`.
+- **Platform Monitoring:** Read-only tracking of all platform trips (`/admin/trips`) with milestone timestamps, and registered users (`/admin/users`).
+- **Audit Trails:** Automatic tracking of verification and active status update timestamps and admin UIDs.
 
 ---
 
@@ -44,7 +55,7 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 - **HTTP Security Headers:** Strict Content-Security-Policy (whitelisting Google Identity Toolkit), HSTS, `X-Content-Type-Options: nosniff`, and `X-Frame-Options: SAMEORIGIN` via `helmet`.
 - **Session Security:** Session ID regeneration (`req.session.regenerate()`) on authentication, `httpOnly`, `sameSite: lax`, 24h expiration, and cookie obfuscation (`dp.sid`).
 - **Input Validation & Sanitization:** Strict payload sanitization, phone validation (7–15 digits), ISO date checks, and boundary enforcement.
-- **Duplicate & Abuse Prevention:** Client-side button disabling and server-side 60-second duplicate trip window query.
+- **Duplicate & Concurrency Defense:** Atomic Firestore transactions prevent conflicting concurrent operations (e.g. tourist cancel vs. driver start).
 - **Strict Whitelist Updates:** Explicit field assignment on all Firestore updates, preventing arbitrary field injection or privilege escalation.
 
 ---
@@ -76,20 +87,21 @@ Destination-Paradise/
 ├── views/
 │   ├── partials/
 │   │   ├── head.ejs             # Universal head, meta tags, CSRF config, stylesheet
-│   │   ├── navbar.ejs           # Role-aware responsive navigation bar
+│   │   ├── navbar.ejs           # Role-aware responsive navigation bar with notification bell
 │   │   ├── flash.ejs            # Auto-dismissing success/error alert banners
 │   │   └── footer.ejs           # Platform model disclosure & legal links
 │   ├── index.ejs                # Landing page & trip request submission
 │   ├── login.ejs                # Tourist authentication
 │   ├── register.ejs             # Tourist registration
-│   ├── dashboard.ejs            # Tourist trip history & driver details
+│   ├── dashboard.ejs            # Tourist trip history & lifecycle progress stepper
+│   ├── notifications.ejs        # In-app notifications feed with mark-as-read controls
 │   ├── driver-login.ejs         # Driver portal login
 │   ├── driver-register.ejs      # Driver registration & onboarding
 │   ├── driver-dashboard.ejs     # Driver summary & active status toggle
 │   ├── driver-profile.ejs       # Driver profile & vehicle specifications
 │   ├── driver-availability.ejs  # Driver calendar availability manager & edit modal
 │   ├── driver-trips.ejs         # Trip requests marketplace
-│   ├── driver-my-trips.ejs      # Driver accepted trips schedule (upcoming vs past)
+│   ├── driver-my-trips.ejs      # Driver schedule (In Progress, Upcoming, Completed, Cancelled)
 │   ├── admin-dashboard.ejs      # Admin overview metrics & pending review queue
 │   ├── admin-drivers.ejs        # Driver directory, search, and status filters
 │   ├── admin-driver-detail.ejs  # Driver review detail, verify/reject/toggle modals
@@ -97,7 +109,7 @@ Destination-Paradise/
 │   └── admin-users.ejs          # Platform user registry & role directory
 ├── scripts/
 │   └── make-admin.js            # CLI tool to promote users to administrator
-├── scratch/                     # Automated test suites (Phase 5, 6, 8)
+├── scratch/                     # Automated test suites (Phases 5, 6, 8, 9)
 ├── firestore.indexes.json       # Firestore composite index definitions
 ├── app.js                       # Express application server
 ├── package.json                 # Node.js dependencies & scripts
@@ -127,6 +139,7 @@ PORT=3000
 NODE_ENV=development
 FIREBASE_API_KEY=your_firebase_web_api_key
 SESSION_SECRET=your_long_random_session_secret
+APP_TIMEZONE=Asia/Colombo
 ```
 Ensure your Firebase Admin service account JSON key is placed at `./key.json` or configured via `GOOGLE_APPLICATION_CREDENTIALS`.
 
@@ -159,8 +172,10 @@ node scratch/test-phase5-regression.js
 
 # Phase 8 Admin Portal & Driver Verification Suite (39 tests)
 node scratch/test-phase8.js
+
+# Phase 9 Trip Lifecycle & Notification Suite
+node scratch/test-phase9.js
 ```
-*Total automated tests passing: 116 / 116 (100% success rate).*
 
 ---
 

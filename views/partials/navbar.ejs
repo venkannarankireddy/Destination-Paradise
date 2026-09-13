@@ -66,6 +66,14 @@
             <a href="/register" class="btn btn-primary btn-sm">Register</a>
             <a href="/driver/login" class="btn btn-secondary btn-sm">Drive With Us</a>
           <% } else { %>
+            <a href="/notifications" class="nav-notification-btn" title="Notifications" style="position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-alt, #f1f5f9); border: 1px solid var(--border-color, #cbd5e1); text-decoration: none; font-size: 1.1rem;">
+              🔔
+              <% if (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) { %>
+                <span style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: white; font-size: 0.68rem; font-weight: 700; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+                  <%= unreadNotificationCount > 9 ? '9+' : unreadNotificationCount %>
+                </span>
+              <% } %>
+            </a>
             <span class="user-tag" title="<%= user.email %>">
               <% if (user.role === 'admin') { %>
                 🛡️ Admin
