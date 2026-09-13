@@ -1,4 +1,7 @@
 require("dotenv").config();
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
+
 const express = require("express");
 const admin = require("firebase-admin");
 const bodyParser = require("body-parser");
@@ -259,6 +262,10 @@ app.get("/dashboard", requireTourist, async (req, res) => {
         status: data.status || "Requested",
         driverId: data.driverId || null,
         driverName: data.driverName || null,
+        driverPhone: data.driverPhone || null,
+        vanModel: data.vanModel || null,
+        vanNumber: data.vanNumber || null,
+        seatingCapacity: data.seatingCapacity || null,
         bookedAt: data.bookedAt
           ? (typeof data.bookedAt.toDate === "function" ? data.bookedAt.toDate().toLocaleString() : new Date(data.bookedAt).toLocaleString())
           : "N/A",
@@ -393,12 +400,14 @@ app.post("/cancel-booking/:id", requireTourist, async (req, res) => {
     }
 
     // Only allow the owner to cancel
-    if (booking.data().email !== req.session.user.email) {
+    const bData = booking.data();
+    if (bData.email !== req.session.user.email && bData.touristId !== req.session.user.uid) {
       return res.status(403).send("Unauthorized.");
     }
 
     await bookingRef.update({
       status: "Cancelled",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     res.redirect("/dashboard");
@@ -678,11 +687,20 @@ app.get("/driver/dashboard", requireDriver, async (req, res) => {
       }
     });
 
+    // Count accepted trips for this driver
+    const acceptedTripsSnap = await db
+      .collection("bookings")
+      .where("driverId", "==", req.session.user.uid)
+      .where("status", "==", "Accepted")
+      .get();
+    const acceptedTripsCount = acceptedTripsSnap.size;
+
     res.render("driver-dashboard", {
       driver: driverDoc.data(),
       availabilities: upcomingAvailabilities,
       totalAvailabilities: availabilities.length,
       matchingTripsCount,
+      acceptedTripsCount,
       user: req.session.user,
     });
   } catch (err) {
@@ -1051,6 +1069,8 @@ app.get("/driver/trips", requireDriver, async (req, res) => {
       driver,
       trips: matchingTrips,
       filters: req.query,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
       user: req.session.user,
     });
   } catch (err) {
@@ -1059,15 +1079,201 @@ app.get("/driver/trips", requireDriver, async (req, res) => {
   }
 });
 
-app.get("/driver/my-trips", requireDriver, (req, res) => {
-  res.render("driver-placeholder", {
-    title: "My Accepted Trips",
-    phase: "Phase 4: Trip Management",
-    icon: "🗓️",
-    description: "View and manage your upcoming and completed accepted tourist trips. This module will be activated in Phase 4.",
-    activeTab: "my-trips",
-    user: req.session.user,
-  });
+// ==========================================
+// DRIVER ACCEPT TRIP ENDPOINT (TRANSACTIONAL)
+// ==========================================
+
+app.post("/driver/trips/:id/accept", requireDriver, async (req, res) => {
+  const tripId = req.params.id;
+  const driverUid = req.session.user.uid;
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes("application/json"));
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // 1. Read target trip
+      const tripRef = db.collection("bookings").doc(tripId);
+      const tripDoc = await transaction.get(tripRef);
+
+      if (!tripDoc.exists) {
+        const err = new Error("Trip not found.");
+        err.code = "TRIP_NOT_FOUND";
+        throw err;
+      }
+
+      const trip = tripDoc.data();
+
+      // 2. Verify trip status is exactly "Requested"
+      if (trip.status !== "Requested") {
+        const err = new Error("This trip has already been accepted by another driver.");
+        err.code = "TRIP_ALREADY_ACCEPTED";
+        throw err;
+      }
+
+      // 3. Read authenticated driver profile
+      const driverRef = db.collection("drivers").doc(driverUid);
+      const driverDoc = await transaction.get(driverRef);
+
+      if (!driverDoc.exists) {
+        const err = new Error("Driver profile not found.");
+        err.code = "DRIVER_NOT_FOUND";
+        throw err;
+      }
+
+      const driver = driverDoc.data();
+
+      // 4. Verify driver isActive == true
+      if (!driver.isActive) {
+        const err = new Error("Your driver account is currently inactive. Activate your profile before accepting trips.");
+        err.code = "DRIVER_INACTIVE";
+        throw err;
+      }
+
+      // 5. Verify driver seating capacity >= trip.people
+      const vanCapacity = Number(driver.seatingCapacity);
+      const tripPeople = Number(trip.people);
+      if (isNaN(vanCapacity) || isNaN(tripPeople) || vanCapacity < tripPeople) {
+        const err = new Error("Your van does not have enough seats for this trip.");
+        err.code = "INSUFFICIENT_CAPACITY";
+        throw err;
+      }
+
+      // 6. Verify driver has an availability window covering the entire trip
+      const availQuery = db
+        .collection("drivers")
+        .doc(driverUid)
+        .collection("availability");
+      const availSnapshot = await transaction.get(availQuery);
+
+      const hasCoverage = availSnapshot.docs.some((doc) => {
+        const period = doc.data();
+        if (period.status !== "available") return false;
+        return trip.fromDate >= period.fromDate && trip.toDate <= period.toDate;
+      });
+
+      if (!hasCoverage) {
+        const err = new Error("You are no longer available for the complete requested date range.");
+        err.code = "AVAILABILITY_CHANGED";
+        throw err;
+      }
+
+      // 7. Verify driver has no overlapping Accepted trip
+      const acceptedQuery = db
+        .collection("bookings")
+        .where("driverId", "==", driverUid)
+        .where("status", "==", "Accepted");
+      const acceptedSnapshot = await transaction.get(acceptedQuery);
+
+      for (const doc of acceptedSnapshot.docs) {
+        const existingTrip = doc.data();
+        // Overlap condition: (newFrom <= existingTo) && (newTo >= existingFrom)
+        if (trip.fromDate <= existingTrip.toDate && trip.toDate >= existingTrip.fromDate) {
+          const err = new Error("You already have an accepted trip during these dates.");
+          err.code = "OVERLAPPING_TRIP";
+          throw err;
+        }
+      }
+
+      // 8. Atomic update: Assign authenticated driver and set status to "Accepted"
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      transaction.update(tripRef, {
+        status: "Accepted",
+        driverId: driverUid,
+        driverName: driver.name || "",
+        driverPhone: driver.phone || "",
+        driverEmail: driver.email || "",
+        vanModel: driver.vanModel || "",
+        vanNumber: driver.vanNumber || "",
+        seatingCapacity: vanCapacity,
+        acceptedAt: serverNow,
+        updatedAt: serverNow,
+      });
+    });
+
+    console.log(`✅ Trip ${tripId} successfully accepted by driver ${driverUid}`);
+
+    if (wantsJson) {
+      return res.status(200).json({
+        success: true,
+        message: "Trip accepted successfully!",
+        tripId,
+      });
+    }
+
+    res.redirect("/driver/my-trips?msg=" + encodeURIComponent("Trip accepted successfully! You can now contact your passenger."));
+  } catch (err) {
+    console.error("❌ Trip acceptance error:", err.code || err.message);
+
+    let userMessage = "Unable to accept the trip right now. Please try again.";
+
+    if (err.code === "TRIP_ALREADY_ACCEPTED") {
+      userMessage = "Sorry, this trip has already been accepted by another driver.";
+    } else if (err.code === "OVERLAPPING_TRIP") {
+      userMessage = "You already have an accepted trip during these dates.";
+    } else if (err.code === "DRIVER_INACTIVE") {
+      userMessage = "Your driver account is currently inactive. Activate your profile before accepting trips.";
+    } else if (err.code === "INSUFFICIENT_CAPACITY") {
+      userMessage = "Your van does not have enough seats for this trip.";
+    } else if (err.code === "AVAILABILITY_CHANGED") {
+      userMessage = "You are no longer available for the complete requested date range.";
+    } else if (err.code === "TRIP_NOT_FOUND") {
+      userMessage = "This trip request does not exist.";
+    }
+
+    if (wantsJson) {
+      const statusCode = err.code === "TRIP_NOT_FOUND" ? 404 : 400;
+      return res.status(statusCode).json({
+        error: err.code || "SERVER_ERROR",
+        message: userMessage,
+      });
+    }
+
+    res.redirect("/driver/trips?err=" + encodeURIComponent(userMessage));
+  }
+});
+
+// ==========================================
+// DRIVER MY ACCEPTED TRIPS
+// ==========================================
+
+app.get("/driver/my-trips", requireDriver, async (req, res) => {
+  try {
+    const todayStr = getTodayDateString();
+
+    const tripsSnapshot = await db
+      .collection("bookings")
+      .where("driverId", "==", req.session.user.uid)
+      .where("status", "==", "Accepted")
+      .get();
+
+    const myTrips = [];
+    tripsSnapshot.forEach((doc) => {
+      myTrips.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    // Upcoming: toDate >= todayStr (sorted by fromDate asc)
+    const upcomingTrips = myTrips
+      .filter((t) => (t.toDate || "") >= todayStr)
+      .sort((a, b) => (a.fromDate || "").localeCompare(b.fromDate || ""));
+
+    // Past: toDate < todayStr (sorted by toDate desc)
+    const pastTrips = myTrips
+      .filter((t) => (t.toDate || "") < todayStr)
+      .sort((a, b) => (b.toDate || "").localeCompare(a.toDate || ""));
+
+    res.render("driver-my-trips", {
+      upcomingTrips,
+      pastTrips,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Driver my-trips error:", err.message);
+    res.status(500).send("Unable to load your accepted trips.");
+  }
 });
 
 // Start server

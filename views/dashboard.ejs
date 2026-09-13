@@ -64,7 +64,7 @@
       <th>Name</th>
       <th>Phone</th>
       <th>Status</th>
-      <th>Assigned Driver</th>
+      <th>Assigned Driver & Vehicle</th>
       <th>Booked At</th>
       <th>Action</th>
     </tr>
@@ -80,19 +80,19 @@
         <td><%= b.countryCode %> <%= b.phone %></td>
         <td>
           <% if (b.status === "Requested") { %>
-            <span style="color:#92400e; font-weight:700; background:#fef3c7; padding:4px 8px; border-radius:12px; font-size:0.85rem;">
+            <span style="color:#92400e; font-weight:700; background:#fef3c7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
               🟡 Looking for Driver
             </span>
           <% } else if (b.status === "Accepted") { %>
-            <span style="color:#166534; font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:12px; font-size:0.85rem;">
+            <span style="color:#166534; font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
               🟢 Driver Assigned
             </span>
           <% } else if (b.status === "Confirmed") { %>
-            <span style="color:green; font-weight:700;">
+            <span style="color:#15803d; font-weight:700; background:#f0fdf4; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
               ✅ Confirmed
             </span>
           <% } else if (b.status === "Cancelled") { %>
-            <span style="color:red; font-weight:700;">
+            <span style="color:#b91c1c; font-weight:700; background:#fef2f2; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
               ❌ Cancelled
             </span>
           <% } else { %>
@@ -100,10 +100,35 @@
           <% } %>
         </td>
         <td>
-          <% if (b.driverId) { %>
-            <span style="font-weight: 600; color: #0f172a;"><%= b.driverName || 'Driver Assigned' %></span>
-          <% } else { %>
+          <% if (b.status === "Accepted" && b.driverName) { %>
+            <div style="font-size: 0.88rem; line-height: 1.45;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">Driver: <%= b.driverName %></div>
+              <div style="color: #334155;">
+                Phone: <a href="tel:<%= b.driverPhone %>" style="color: #0284c7; text-decoration: none; font-weight: 600;"><%= b.driverPhone %></a>
+              </div>
+              <div style="color: #475569;">
+                Van: <%= b.vanModel %>
+              </div>
+              <div style="color: #475569;">
+                Vehicle: <%= b.vanNumber %>
+              </div>
+              <div style="color: #475569;">
+                Capacity: <%= b.seatingCapacity %> seats
+              </div>
+            </div>
+          <% } else if (b.status === "Requested") { %>
             <span style="color: #64748b; font-style: italic;">Not assigned yet</span>
+          <% } else if (b.status === "Cancelled") { %>
+            <% if (b.driverName) { %>
+              <div style="font-size: 0.82rem; color: #94a3b8;">
+                <span style="text-decoration: line-through;"><%= b.driverName %></span>
+                <div>(Trip Cancelled)</div>
+              </div>
+            <% } else { %>
+              <span style="color: #94a3b8; font-style: italic;">None</span>
+            <% } %>
+          <% } else { %>
+            <span style="color: #64748b; font-style: italic;">Package Booking</span>
           <% } %>
         </td>
         <td><%= b.bookedAt %></td>

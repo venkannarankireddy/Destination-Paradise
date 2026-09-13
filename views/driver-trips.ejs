@@ -320,14 +320,56 @@
       background: #15803d;
     }
 
-    .read-only-pill {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 0.76rem;
-      color: #64748b;
-      background: #f1f5f9;
-      padding: 6px;
+    /* ALERTS */
+    .alert {
+      padding: 1rem 1.2rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .alert-success {
+      background-color: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .alert-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .direct-notice {
+      font-size: 0.8rem;
+      color: #475569;
+      background: #f8fafc;
+      padding: 8px 10px;
       border-radius: 6px;
+      margin-top: 10px;
+      line-height: 1.4;
+      text-align: center;
+      border: 1px dashed #cbd5e1;
+    }
+
+    .btn-accept {
+      width: 100%;
+      background: #10b981;
+      color: white;
+      text-align: center;
+      padding: 11px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: block;
+    }
+    .btn-accept:hover {
+      background: #059669;
+    }
+    .btn-accept:active {
+      transform: scale(0.98);
     }
 
     /* EMPTY STATE */
@@ -370,6 +412,18 @@
     </div>
     <a href="/driver/dashboard" style="color: #64748b; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
   </div>
+
+  <% if (typeof successMessage !== 'undefined' && successMessage) { %>
+    <div class="alert alert-success">
+      <%= successMessage %>
+    </div>
+  <% } %>
+
+  <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
+    <div class="alert alert-error">
+      <%= errorMessage %>
+    </div>
+  <% } %>
 
   <!-- BUSINESS MODEL CONTACT NOTICE -->
   <div class="banner-notice">
@@ -482,9 +536,16 @@
                 </a>
               <% } %>
             </div>
-            <div class="read-only-pill">
-              Direct Contact Mode &bull; Acceptance will be enabled in Phase 5
+
+            <div class="direct-notice">
+              Please contact the tourist first and agree on trip details/payment.
             </div>
+
+            <form action="/driver/trips/<%= trip.id %>/accept" method="POST" onsubmit="return confirm('Have you contacted the tourist and agreed on the trip details and payment terms? Do you want to accept this trip?');" style="margin-top: 8px;">
+              <button type="submit" class="btn-accept">
+                🤝 Accept Trip
+              </button>
+            </form>
           </div>
         </div>
       <% }) %>
