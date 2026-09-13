@@ -1,0 +1,65 @@
+<header class="site-header">
+  <div class="container">
+    <nav class="navbar">
+      <% if (typeof user !== 'undefined' && user && user.role === 'driver') { %>
+        <!-- DRIVER BRAND -->
+        <a href="/driver/dashboard" class="brand">
+          <span class="brand-icon">🚐</span>
+          Destination Paradise
+          <span class="brand-badge">DRIVER</span>
+        </a>
+      <% } else { %>
+        <!-- TOURIST / PUBLIC BRAND -->
+        <a href="/" class="brand">
+          <span class="brand-icon">🌴</span>
+          Destination Paradise
+        </a>
+      <% } %>
+
+      <!-- MOBILE TOGGLE BUTTON -->
+      <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        ☰
+      </button>
+
+      <!-- NAVIGATION MENU -->
+      <div class="nav-menu" id="navMenu">
+        <ul class="nav-links">
+          <% if (typeof user === 'undefined' || !user) { %>
+            <!-- ANONYMOUS GUEST LINKS -->
+            <li><a href="/" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'home' ? 'active' : '' %>">Home</a></li>
+            <li><a href="/#how-it-works" class="nav-link">How It Works</a></li>
+            <li><a href="/#packages" class="nav-link">Packages</a></li>
+            <li><a href="/#booking" class="nav-link">Book a Trip</a></li>
+          <% } else if (user.role === 'driver') { %>
+            <!-- VAN DRIVER LINKS -->
+            <li><a href="/driver/dashboard" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">Dashboard</a></li>
+            <li><a href="/driver/trips" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'trips' ? 'active' : '' %>">Find Trips</a></li>
+            <li><a href="/driver/my-trips" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'my-trips' ? 'active' : '' %>">My Trips</a></li>
+            <li><a href="/driver/availability" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'availability' ? 'active' : '' %>">Availability</a></li>
+            <li><a href="/driver/profile" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'profile' ? 'active' : '' %>">Van Profile</a></li>
+          <% } else { %>
+            <!-- TOURIST LINKS -->
+            <li><a href="/" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'home' ? 'active' : '' %>">Home</a></li>
+            <li><a href="/dashboard" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">My Trips</a></li>
+            <li><a href="/#booking" class="nav-link">Book a Trip</a></li>
+          <% } %>
+        </ul>
+
+        <!-- NAV ACTIONS -->
+        <div class="nav-actions">
+          <% if (typeof user === 'undefined' || !user) { %>
+            <a href="/login" class="btn btn-outline btn-sm">Login</a>
+            <a href="/register" class="btn btn-primary btn-sm">Register</a>
+            <a href="/driver/login" class="btn btn-secondary btn-sm">Drive With Us</a>
+          <% } else { %>
+            <span class="user-tag" title="<%= user.email %>">
+              <%= user.role === 'driver' ? '🚐 ' : '👤 ' %><%= user.name || user.email %>
+            </span>
+            <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+          <% } %>
+        </div>
+      </div>
+    </nav>
+  </div>
+</header>
+

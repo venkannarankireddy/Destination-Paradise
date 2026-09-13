@@ -1,560 +1,232 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Trip Requests Marketplace | Destination Paradise</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    body {
-      background-color: #f7f9fc;
-      color: #333;
-      min-height: 100vh;
-    }
-    /* NAVBAR */
-    .driver-nav {
-      background-color: #1e293b;
-      color: #fff;
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .driver-nav .brand {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #f06292;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-    }
-    .driver-nav .brand span {
-      background: #e91e63;
-      color: white;
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-    }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 1.2rem;
-      flex-wrap: wrap;
-    }
-    .nav-links a {
-      color: #e2e8f0;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 0.95rem;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover, .nav-links a.active {
-      color: #f06292;
-    }
-    .logout-btn {
-      background: #dc2626;
-      color: white;
-      padding: 6px 14px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.88rem;
-    }
+<%- include('partials/head', { title: 'Trip Requests Marketplace' }) %>
+<%- include('partials/navbar', { activePage: 'trips' }) %>
 
-    /* CONTAINER */
-    .container {
-      max-width: 1100px;
-      margin: 2.5rem auto;
-      padding: 0 1.5rem;
-    }
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container">
+    <%- include('partials/flash') %>
 
-    .page-header {
-      margin-bottom: 1.5rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .page-header h1 {
-      font-size: 1.8rem;
-      color: #0f172a;
-    }
-    .page-header p {
-      color: #64748b;
-      font-size: 0.95rem;
-      margin-top: 4px;
-    }
-
-    /* IMPORTANT NOTICE BANNER */
-    .banner-notice {
-      background: #eff6ff;
-      border-left: 5px solid #3b82f6;
-      padding: 1.2rem 1.5rem;
-      border-radius: 10px;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-    }
-    .banner-notice h3 {
-      color: #1e40af;
-      font-size: 1rem;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .banner-notice p {
-      color: #3b82f6;
-      font-size: 0.92rem;
-      line-height: 1.5;
-    }
-
-    .banner-inactive {
-      background: #fef2f2;
-      border-left: 5px solid #ef4444;
-      padding: 1.2rem 1.5rem;
-      border-radius: 10px;
-      margin-bottom: 2rem;
-      color: #991b1b;
-    }
-
-    /* FILTER BAR */
-    .filter-card {
-      background: white;
-      padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      margin-bottom: 2rem;
-    }
-    .filter-form {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto;
-      gap: 1rem;
-      align-items: flex-end;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-    .form-group label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 0.35rem;
-    }
-    .form-group input {
-      padding: 0.65rem 0.8rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: #f8fafc;
-    }
-    .form-group input:focus {
-      outline: none;
-      border-color: #e91e63;
-      background: white;
-    }
-    .btn-filter {
-      background: #1e293b;
-      color: white;
-      padding: 0.7rem 1.4rem;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.9rem;
-      height: 40px;
-    }
-    .btn-filter:hover {
-      background: #0f172a;
-    }
-    .btn-clear {
-      background: #f1f5f9;
-      color: #475569;
-      padding: 0.7rem 1rem;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      text-decoration: none;
-      font-size: 0.9rem;
-      display: inline-block;
-      text-align: center;
-      height: 40px;
-      line-height: 20px;
-    }
-    .btn-clear:hover {
-      background: #e2e8f0;
-    }
-
-    /* TRIPS GRID */
-    .trips-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 1.5rem;
-    }
-    .trip-card {
-      background: white;
-      border-radius: 14px;
-      padding: 1.6rem;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-      border: 1px solid #e2e8f0;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .trip-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      border-color: #fbcfe8;
-    }
-    .trip-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1rem;
-    }
-    .trip-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #0f172a;
-    }
-    .badge-requested {
-      background: #fef3c7;
-      color: #92400e;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .trip-dates {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #334155;
-      margin-bottom: 0.6rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .trip-passengers {
-      font-size: 0.9rem;
-      color: #64748b;
-      margin-bottom: 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .tourist-box {
-      background: #f8fafc;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1.2rem;
-      border-left: 3px solid #e91e63;
-    }
-    .tourist-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-    .tourist-name {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 4px;
-    }
-    .tourist-phone {
-      font-size: 0.92rem;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* ACTION BUTTONS */
-    .contact-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: auto;
-    }
-    .btn-call {
-      flex: 1;
-      background: #0284c7;
-      color: white;
-      text-align: center;
-      padding: 10px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.88rem;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-    .btn-call:hover {
-      background: #0369a1;
-    }
-    .btn-whatsapp {
-      flex: 1;
-      background: #16a34a;
-      color: white;
-      text-align: center;
-      padding: 10px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.88rem;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-    .btn-whatsapp:hover {
-      background: #15803d;
-    }
-
-    /* ALERTS */
-    .alert {
-      padding: 1rem 1.2rem;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      font-size: 0.95rem;
-      font-weight: 500;
-    }
-    .alert-success {
-      background-color: #d1fae5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
-    }
-    .alert-error {
-      background-color: #fee2e2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-    }
-
-    .direct-notice {
-      font-size: 0.8rem;
-      color: #475569;
-      background: #f8fafc;
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-top: 10px;
-      line-height: 1.4;
-      text-align: center;
-      border: 1px dashed #cbd5e1;
-    }
-
-    .btn-accept {
-      width: 100%;
-      background: #10b981;
-      color: white;
-      text-align: center;
-      padding: 11px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.92rem;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      display: block;
-    }
-    .btn-accept:hover {
-      background: #059669;
-    }
-    .btn-accept:active {
-      transform: scale(0.98);
-    }
-
-    /* EMPTY STATE */
-    .empty-card {
-      background: white;
-      border-radius: 14px;
-      padding: 3.5rem 2rem;
-      text-align: center;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-      color: #64748b;
-    }
-    .empty-icon {
-      font-size: 3.5rem;
-      margin-bottom: 1rem;
-    }
-  </style>
-</head>
-<body>
-
-<!-- NAVIGATION -->
-<nav class="driver-nav">
-  <a href="/driver/dashboard" class="brand">
-    Destination Paradise <span>DRIVER</span>
-  </a>
-  <div class="nav-links">
-    <a href="/driver/dashboard">Dashboard</a>
-    <a href="/driver/profile">Van Profile</a>
-    <a href="/driver/availability">Availability</a>
-    <a href="/driver/trips" class="active">Trip Requests</a>
-    <a href="/driver/my-trips">My Trips</a>
-    <a href="/logout" class="logout-btn">Logout</a>
-  </div>
-</nav>
-
-<div class="container">
-  <div class="page-header">
-    <div>
-      <h1>Trip Requests Marketplace</h1>
-      <p>Discover tourist long-distance trip requests matching your van capacity and availability schedule.</p>
-    </div>
-    <a href="/driver/dashboard" style="color: #64748b; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
-  </div>
-
-  <% if (typeof successMessage !== 'undefined' && successMessage) { %>
-    <div class="alert alert-success">
-      <%= successMessage %>
-    </div>
-  <% } %>
-
-  <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
-    <div class="alert alert-error">
-      <%= errorMessage %>
-    </div>
-  <% } %>
-
-  <!-- BUSINESS MODEL CONTACT NOTICE -->
-  <div class="banner-notice">
-    <h3>📢 Direct Tourist Communication Platform</h3>
-    <p>Contact the tourist directly to discuss pricing, luggage space, and trip details. <strong>Destination Paradise does not process payments.</strong> Once you and the tourist agree on terms, trip acceptance will be confirmed.</p>
-  </div>
-
-  <% if (!driver.isActive) { %>
-    <div class="banner-inactive">
-      <strong>⚠️ You are currently Inactive / Paused.</strong>
-      <p style="margin-top: 4px;">You must set your status to Active on your dashboard to see matching trip requests.</p>
-    </div>
-  <% } %>
-
-  <!-- FILTERS -->
-  <div class="filter-card">
-    <form action="/driver/trips" method="GET" class="filter-form">
-      <div class="form-group">
-        <label for="destination">Destination</label>
-        <input type="text" id="destination" name="destination" placeholder="e.g. Bali, Manali..." value="<%= filters.destination || '' %>" />
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <h1 style="font-size: 1.85rem; color: var(--primary-900);">
+          Trip Requests Marketplace
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Browse tourist long-distance travel requests matching your scheduled availability and van seating capacity.
+        </p>
       </div>
 
-      <div class="form-group">
-        <label for="fromDate">From Date</label>
-        <input type="date" id="fromDate" name="fromDate" value="<%= filters.fromDate || '' %>" />
-      </div>
-
-      <div class="form-group">
-        <label for="toDate">To Date</label>
-        <input type="date" id="toDate" name="toDate" value="<%= filters.toDate || '' %>" />
-      </div>
-
-      <div class="form-group">
-        <label for="people">Max Passengers</label>
-        <input type="number" id="people" name="people" min="1" max="<%= driver.seatingCapacity %>" placeholder="Up to <%= driver.seatingCapacity %>" value="<%= filters.people || '' %>" />
-      </div>
-
-      <div style="display: flex; gap: 8px;">
-        <button type="submit" class="btn-filter">Filter</button>
-        <a href="/driver/trips" class="btn-clear">Reset</a>
-      </div>
-    </form>
-  </div>
-
-  <!-- MATCHING TRIPS LIST -->
-  <% if (trips.length === 0) { %>
-    <div class="empty-card">
-      <div class="empty-icon">🚐</div>
-      <h3 style="font-size: 1.3rem; color: #0f172a; margin-bottom: 6px;">No Matching Trip Requests</h3>
-      <p style="max-width: 500px; margin: 0 auto 1.5rem auto;">
-        <% if (!driver.isActive) { %>
-          Your driver account is paused. Turn on active status to view trip requests.
-        <% } else { %>
-          There are currently no open trip requests that fit within your scheduled availability dates and van capacity (<%= driver.seatingCapacity %> seats).
-        <% } %>
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: center;">
-        <a href="/driver/availability" style="background: #e91e63; color: white; padding: 8px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">+ Update Availability Dates</a>
-        <% if (!driver.isActive) { %>
-          <form action="/driver/toggle-active" method="POST" style="display:inline;">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" style="background: #10b981; color: white; padding: 8px 18px; border-radius: 8px; border:none; font-weight: 600; cursor: pointer;">Activate Driver Status</button>
-          </form>
-        <% } %>
+      <div style="display: flex; gap: 10px;">
+        <a href="/driver/availability" class="btn btn-outline btn-sm">
+          📅 Manage Availability
+        </a>
+        <a href="/driver/my-trips" class="btn btn-secondary btn-sm">
+          📋 My Accepted Trips
+        </a>
       </div>
     </div>
-  <% } else { %>
-    <div style="margin-bottom: 1rem; font-weight: 600; color: #64748b;">
-      Showing <%= trips.length %> matching trip request<%= trips.length === 1 ? '' : 's' %> for your <%= driver.vanModel %> (<%= driver.seatingCapacity %> seats)
+
+    <!-- DIRECT COMMUNCATION ADVISORY BANNER -->
+    <div class="card" style="margin-bottom: 2rem; border-left: 5px solid var(--secondary-500); background: #fdfaf6;">
+      <div style="display: flex; align-items: flex-start; gap: 14px;">
+        <div style="font-size: 1.8rem; line-height: 1;">📢</div>
+        <div>
+          <h3 style="font-size: 1.05rem; color: var(--primary-900); margin-bottom: 4px;">
+            Direct Tourist-to-Driver Agreement Model
+          </h3>
+          <p style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            Destination Paradise connects you directly with tourists. <strong>We do not process payments or collect commissions.</strong> 
+            Always call or message the tourist first to confirm pickup details, itinerary, luggage capacity, and mutually agreed compensation before clicking <strong>Accept Trip</strong>.
+          </p>
+        </div>
+      </div>
     </div>
 
-    <div class="trips-grid">
-      <% trips.forEach((trip) => { %>
-        <% 
-          // Normalize phone for WhatsApp link
-          const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
-          const waDigits = cleanPhone.replace(/[^0-9]/g, '');
-        %>
-        <div class="trip-card">
+    <!-- INACTIVE STATUS ALERT -->
+    <% if (!driver.isActive) { %>
+      <div class="card" style="margin-bottom: 2rem; border-left: 5px solid var(--danger); background: #fff5f5;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <div class="trip-header">
-              <div class="trip-title">🌴 <%= trip.destination %></div>
-              <span class="badge-requested">🟡 Looking for Driver</span>
-            </div>
-
-            <div class="trip-dates">
-              <span>📅</span> <%= trip.fromDate %> &rarr; <%= trip.toDate %>
-            </div>
-
-            <div class="trip-passengers">
-              <span>👥</span> <strong><%= trip.people %></strong> Passenger<%= trip.people === 1 ? '' : 's' %> (Fits in <%= driver.seatingCapacity %>-seat van)
-            </div>
-
-            <div class="tourist-box">
-              <div class="tourist-label">Tourist Contact</div>
-              <div class="tourist-name"><%= trip.name %></div>
-              <div class="tourist-phone">
-                <span>📞</span> <%= trip.countryCode %> <%= trip.phone %>
-              </div>
-            </div>
+            <h3 style="font-size: 1.05rem; color: #991b1b; margin-bottom: 4px;">
+              ⚠️ You are currently Paused from Trip Matching
+            </h3>
+            <p style="font-size: 0.92rem; color: #7f1d1d; margin: 0;">
+              Your driver status is set to inactive. Turn your profile on to see live matching trip requests from tourists.
+            </p>
           </div>
+          <form action="/driver/toggle-active" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              ▶️ Activate Profile
+            </button>
+          </form>
+        </div>
+      </div>
+    <% } %>
 
-          <div>
-            <div class="contact-actions">
-              <a href="tel:<%= trip.countryCode %><%= trip.phone %>" class="btn-call">
-                📞 Call Tourist
-              </a>
-              <% if (waDigits) { %>
-                <a href="https://wa.me/<%= waDigits %>?text=Hello%20<%= encodeURIComponent(trip.name) %>,%20I%20am%20a%20van%20driver%20on%20Destination%20Paradise%20interested%20in%20your%20trip%20to%20<%= encodeURIComponent(trip.destination) %>." target="_blank" class="btn-whatsapp">
-                  💬 WhatsApp
-                </a>
-              <% } %>
-            </div>
+    <!-- FILTER BAR -->
+    <div class="card" style="margin-bottom: 2.5rem; padding: 1.5rem;">
+      <form action="/driver/trips" method="GET" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto; gap: 1rem; align-items: flex-end;">
+        <div class="form-group" style="margin: 0;">
+          <label for="destination" class="form-label" style="font-size: 0.82rem;">Destination</label>
+          <input 
+            type="text" 
+            id="destination" 
+            name="destination" 
+            class="form-input" 
+            placeholder="e.g. Manali, Goa, Munnar..." 
+            value="<%= filters.destination || '' %>"
+          />
+        </div>
 
-            <div class="direct-notice">
-              Please contact the tourist first and agree on trip details/payment.
-            </div>
+        <div class="form-group" style="margin: 0;">
+          <label for="fromDate" class="form-label" style="font-size: 0.82rem;">From Date</label>
+          <input 
+            type="date" 
+            id="fromDate" 
+            name="fromDate" 
+            class="form-input" 
+            value="<%= filters.fromDate || '' %>"
+          />
+        </div>
 
-            <form action="/driver/trips/<%= trip.id %>/accept" method="POST" onsubmit="return confirm('Have you contacted the tourist and agreed on the trip details and payment terms? Do you want to accept this trip?');" style="margin-top: 8px;">
+        <div class="form-group" style="margin: 0;">
+          <label for="toDate" class="form-label" style="font-size: 0.82rem;">To Date</label>
+          <input 
+            type="date" 
+            id="toDate" 
+            name="toDate" 
+            class="form-input" 
+            value="<%= filters.toDate || '' %>"
+          />
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label for="people" class="form-label" style="font-size: 0.82rem;">Max Passengers</label>
+          <input 
+            type="number" 
+            id="people" 
+            name="people" 
+            class="form-input" 
+            min="1" 
+            max="<%= driver.seatingCapacity %>" 
+            placeholder="Up to <%= driver.seatingCapacity %>" 
+            value="<%= filters.people || '' %>"
+          />
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1.25rem;">
+            Filter
+          </button>
+          <a href="/driver/trips" class="btn btn-outline" style="height: 42px; display: inline-flex; align-items: center; padding: 0 1rem;">
+            Reset
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- MATCHING TRIPS LIST -->
+    <% if (trips.length === 0) { %>
+      <div class="empty-state">
+        <div class="empty-state-icon">🚐</div>
+        <h3 class="empty-state-title">No Matching Trip Requests</h3>
+        <p class="empty-state-desc">
+          <% if (!driver.isActive) { %>
+            Your driver account is currently paused. Activate your profile to browse open trip requests from travelers.
+          <% } else { %>
+            There are currently no open trip requests that fit within your scheduled availability windows and van capacity (<%= driver.seatingCapacity %> seats).
+          <% } %>
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a href="/driver/availability" class="btn btn-secondary">
+            📅 Update Availability Dates
+          </a>
+          <% if (!driver.isActive) { %>
+            <form action="/driver/toggle-active" method="POST" style="display:inline;">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button type="submit" class="btn-accept">
-                🤝 Accept Trip
+              <button type="submit" class="btn btn-primary">
+                ▶️ Activate Profile
               </button>
             </form>
-          </div>
+          <% } %>
         </div>
-      <% }) %>
-    </div>
-  <% } %>
-</div>
+      </div>
+    <% } else { %>
+      <div style="margin-bottom: 1.25rem; font-weight: 600; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+        <span>
+          Showing <strong><%= trips.length %></strong> matching trip request<%= trips.length === 1 ? '' : 's' %> for your <%= driver.vanModel %> (<%= driver.seatingCapacity %> seats)
+        </span>
+      </div>
 
-</body>
-</html>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <% trips.forEach((trip) => { %>
+          <% 
+            const cleanPhone = (trip.countryCode || '') + (trip.phone || '');
+            const waDigits = cleanPhone.replace(/[^0-9]/g, '');
+          %>
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--secondary-500);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 0;">
+                  🌴 <%= trip.destination %>
+                </h3>
+                <span class="badge badge-pending">🟡 Looking for Driver</span>
+              </div>
 
+              <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>📅</span> <%= trip.fromDate %> &rarr; <%= trip.toDate %>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                  <span>👥</span> <strong><%= trip.people %></strong> Passenger<%= trip.people === 1 ? '' : 's' %> (Fits in <%= driver.seatingCapacity %>-seat van)
+                </div>
+              </div>
+
+              <!-- TOURIST CONTACT BOX -->
+              <div style="background: var(--bg-alt); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; border-left: 3px solid var(--secondary-500);">
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
+                  Tourist Details
+                </div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--primary-900); margin-bottom: 4px;">
+                  <%= trip.name %>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                  <span>📞</span> <%= trip.countryCode %> <%= trip.phone %>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <!-- DIRECT CONTACT ACTIONS -->
+              <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <a href="tel:<%= trip.countryCode %><%= trip.phone %>" class="btn btn-outline btn-sm" style="flex: 1; text-align: center;">
+                  📞 Call Tourist
+                </a>
+                <% if (waDigits) { %>
+                  <a href="https://wa.me/<%= waDigits %>?text=Hello%20<%= encodeURIComponent(trip.name) %>,%20I%20am%20a%20van%20driver%20on%20Destination%20Paradise%20interested%20in%20your%20trip%20to%20<%= encodeURIComponent(trip.destination) %>." target="_blank" class="btn btn-teal btn-sm" style="flex: 1; text-align: center;">
+                    💬 WhatsApp
+                  </a>
+                <% } %>
+              </div>
+
+              <div style="font-size: 0.78rem; color: var(--text-muted); background: var(--bg-alt); padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 10px; text-align: center; border: 1px dashed var(--border-subtle); line-height: 1.35;">
+                Contact tourist directly to agree on pricing and trip details before accepting.
+              </div>
+
+              <!-- ACCEPT ACTION -->
+              <form action="/driver/trips/<%= trip.id %>/accept" method="POST" onsubmit="return confirm('Have you contacted the tourist and agreed on the trip details and payment terms? Do you want to accept this trip?');">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                  🤝 Accept Trip
+                </button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

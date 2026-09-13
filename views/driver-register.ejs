@@ -1,191 +1,104 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Driver Registration | Destination Paradise</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: url('/images/home4.jpg') no-repeat center center fixed;
-      background-size: cover;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 2rem 1rem;
-    }
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.4);
-      z-index: 0;
-    }
-    .register-container {
-      position: relative;
-      z-index: 1;
-      background: rgba(255, 255, 255, 0.18);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-radius: 16px;
-      padding: 2.5rem;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-      color: #fff;
-    }
-    h2 {
-      margin-bottom: 0.5rem;
-      font-weight: 700;
-      text-align: center;
-    }
-    .subtext {
-      text-align: center;
-      font-size: 0.9rem;
-      color: #ffebf0;
-      margin-bottom: 1.5rem;
-    }
-    .form-group {
-      margin-bottom: 1rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.3rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #fff;
-    }
-    input, select {
-      width: 100%;
-      padding: 0.65rem 0.8rem;
-      border: none;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.9);
-      color: #333;
-      font-size: 14px;
-      box-sizing: border-box;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    }
-    input:focus, select:focus {
-      outline: 2px solid #e91e63;
-      background: #fff;
-    }
-    .form-row {
-      display: flex;
-      gap: 12px;
-    }
-    .form-row .form-group {
-      flex: 1;
-    }
-    button {
-      width: 100%;
-      padding: 0.8rem;
-      background: #e91e63;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 1rem;
-      transition: background 0.3s ease;
-      margin-top: 1rem;
-      box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
-    }
-    button:hover {
-      background: #d81b60;
-    }
-    p {
-      margin-top: 1.2rem;
-      font-size: 0.9rem;
-      text-align: center;
-    }
-    a {
-      color: #ffeef5;
-      font-weight: bold;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .badge {
-      display: inline-block;
-      background: #ff5722;
-      color: white;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: bold;
-      margin-bottom: 0.5rem;
-    }
-  </style>
-</head>
-<body>
-<div class="overlay"></div>
-<div class="register-container">
-  <div style="text-align: center;">
-    <span class="badge">VAN DRIVER PORTAL</span>
+<%- include('partials/head', { title: 'Driver Registration' }) %>
+<%- include('partials/navbar', { activePage: 'driver-register' }) %>
+
+<main style="padding: 3.5rem 0; min-height: 80vh;">
+  <div class="container container-narrow">
+    <div class="card" style="max-width: 600px; margin: 0 auto; padding: 2.5rem; box-shadow: var(--shadow-md); border-top: 4px solid var(--primary-800);">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 48px; height: 48px; font-size: 1.5rem; background: var(--primary-800);">
+          🚐
+        </div>
+        <span class="brand-badge" style="font-size: 0.75rem; padding: 3px 8px; margin-bottom: 0.5rem; display: inline-block;">
+          VAN DRIVER PORTAL
+        </span>
+        <h1 style="font-size: 1.6rem; color: var(--primary-900); margin-top: 4px;">Driver Onboarding</h1>
+        <p style="font-size: 0.92rem; color: var(--text-muted); margin-top: 4px;">
+          Join Destination Paradise to discover matching tourist trip requests in your region.
+        </p>
+      </div>
+
+      <%- include('partials/flash') %>
+
+      <form action="/driver/register" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="form-section-title">
+          <span>👤</span> Personal & Account Information
+        </div>
+
+        <div class="form-group">
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" name="name" class="form-control" placeholder="e.g. Ramesh Kumar" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">Driver Email Address *</label>
+            <input type="email" id="email" name="email" class="form-control" placeholder="driver@example.com" required autocomplete="email" />
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone / WhatsApp Number *</label>
+            <input type="tel" id="phone" name="phone" class="form-control" placeholder="+91 9876543210" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="password">Account Password *</label>
+            <input type="password" id="password" name="password" class="form-control" placeholder="Min 6 characters" required minlength="6" autocomplete="new-password" />
+          </div>
+
+          <div class="form-group">
+            <label for="licenseNumber">Driver License Number *</label>
+            <input type="text" id="licenseNumber" name="licenseNumber" class="form-control" placeholder="e.g. DL-04-20150012345" required />
+          </div>
+        </div>
+
+        <div class="form-section-title">
+          <span>🚐</span> Vehicle Specifications
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vanModel">Van Make & Model *</label>
+            <input type="text" id="vanModel" name="vanModel" class="form-control" placeholder="e.g. Force Traveller, Toyota HiAce" required />
+          </div>
+
+          <div class="form-group">
+            <label for="vanNumber">Vehicle Registration Plate *</label>
+            <input type="text" id="vanNumber" name="vanNumber" class="form-control" placeholder="e.g. TS 09 AB 1234" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="seatingCapacity">Passenger Seating Capacity *</label>
+            <input type="number" id="seatingCapacity" name="seatingCapacity" class="form-control" min="4" max="20" placeholder="e.g. 12" required />
+            <div class="form-hint">Passenger seats excluding driver (4 to 20 seats).</div>
+          </div>
+
+          <div class="form-group">
+            <label for="experienceYears">Driving Experience (Years) *</label>
+            <input type="number" id="experienceYears" name="experienceYears" class="form-control" min="0" max="60" placeholder="e.g. 7" required />
+          </div>
+        </div>
+
+        <div style="margin-top: 1.75rem;">
+          <button type="submit" class="btn btn-secondary btn-block btn-lg">
+            Complete Driver Registration
+          </button>
+        </div>
+      </form>
+
+      <div style="margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: center;">
+        <p style="font-size: 0.9rem; color: var(--text-muted);">
+          Already registered as a driver? 
+          <a href="/driver/login" style="font-weight: 700; color: var(--teal-600);">Sign in here</a>
+        </p>
+      </div>
+    </div>
   </div>
-  <h2>Register as a Van Driver</h2>
-  <p class="subtext">Join Destination Paradise to connect with tourists for long-distance trips.</p>
+</main>
 
-  <form action="/driver/register" method="POST">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <div class="form-group">
-      <label for="name">Full Name *</label>
-      <input type="text" id="name" name="name" placeholder="e.g. John Doe" required />
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="email">Email Address *</label>
-        <input type="email" id="email" name="email" placeholder="driver@example.com" required />
-      </div>
-      <div class="form-group">
-        <label for="phone">Phone Number *</label>
-        <input type="tel" id="phone" name="phone" placeholder="+91 9876543210" required />
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="password">Password *</label>
-        <input type="password" id="password" name="password" placeholder="At least 6 characters" minlength="6" required />
-      </div>
-      <div class="form-group">
-        <label for="licenseNumber">Driver License # *</label>
-        <input type="text" id="licenseNumber" name="licenseNumber" placeholder="DL-XXXXXXX" required />
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="vanModel">Van Model & Make *</label>
-        <input type="text" id="vanModel" name="vanModel" placeholder="e.g. Toyota HiAce / Tempo Traveller" required />
-      </div>
-      <div class="form-group">
-        <label for="vanNumber">Vehicle Plate / Registration # *</label>
-        <input type="text" id="vanNumber" name="vanNumber" placeholder="e.g. AP 09 XX 1234" required />
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="seatingCapacity">Passenger Capacity (Seats) *</label>
-        <input type="number" id="seatingCapacity" name="seatingCapacity" min="4" max="20" placeholder="4 - 20" required />
-      </div>
-      <div class="form-group">
-        <label for="experienceYears">Driving Experience (Years) *</label>
-        <input type="number" id="experienceYears" name="experienceYears" min="0" max="60" placeholder="e.g. 5" required />
-      </div>
-    </div>
-
-    <button type="submit">Register as Driver</button>
-  </form>
-
-  <p>Already registered as a driver? <a href="/driver/login">Driver Login</a></p>
-  <p style="font-size: 0.85rem; margin-top: 0.5rem;">Are you a tourist? <a href="/register">Tourist Registration</a></p>
-</div>
-</body>
-</html>
-
+<%- include('partials/footer') %>

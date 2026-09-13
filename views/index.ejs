@@ -1,239 +1,290 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Destination Paradise</title>
-  <link rel="stylesheet" href="/css/style.css" />
-  <script type="module" src="/js/booking.js"></script>
-</head>
-<body>
-  <!-- NAVBAR -->
-  <nav class="navbar">
-    <div class="nav-left">
-      <a href="/" class="brand">Destination Paradise</a>
-      <a href="#home">Home</a>
-      <div class="dropdown">
-        <a class="dropdown-toggle">Destinations</a>
-        <div class="dropdown-menu">
-          <a href="https://www.holidify.com/collections/beaches-near-hyderabad">Beach Getaway</a>
-          <a href="https://www.google.com/search?q=travel+adventure+pics">Mountain Adventure</a>
-          <a href="https://www.google.com/search?q=city+life">City Life Experience</a>
-          <a href="https://www.google.com/search?q=most+travelled+places+in+india">More</a>
+<%- include('partials/head', { title: 'Find Local Van Drivers for Tourist Trips' }) %>
+<%- include('partials/navbar', { activePage: 'home' }) %>
+
+<main>
+  <!-- HERO SECTION -->
+  <section class="hero-section" id="home">
+    <div class="container">
+      <div class="hero-grid">
+        <div>
+          <div class="hero-badge">
+            <span>🚐</span> Tourist & Van Driver Matching Platform
+          </div>
+          <h1 class="hero-title">
+            Your Journey. Your Driver. <span>Your Adventure.</span>
+          </h1>
+          <p class="hero-subtitle">
+            Destination Paradise connects travelers with registered local van drivers for scenic, comfortable road trips. 
+            Submit your trip request, get discovered by drivers with matching van capacity, and arrange terms directly.
+          </p>
+          <div class="hero-ctas">
+            <a href="#booking" class="btn btn-primary btn-lg">Plan Your Trip</a>
+            <a href="/driver/register" class="btn btn-secondary btn-lg">Drive With Us</a>
+          </div>
         </div>
-      </div>
-      <a href="#about">About</a>
-    </div>
 
-    <div class="nav-right">
-      <input type="text" id="search" placeholder="Search packages..." />
-      <% if (!user) { %>
-        <a href="/login" class="nav-auth-btn">Login</a>
-        <a href="/register" class="nav-auth-btn">Register</a>
-        <a href="/driver/login" class="nav-auth-btn" style="background-color: #1e293b; color: #fff;">Drive With Us</a>
-        <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
-      <% } else if (user.role === 'driver') { %>
-        <span style="font-weight: 600; color: #1e293b; margin-right: 10px;">🚐 Driver: <%= user.email %></span>
-        <a href="/driver/dashboard" class="nav-auth-btn" style="background-color: #1e293b;">Dashboard</a>
-        <a href="/driver/profile" class="nav-auth-btn" style="background-color: #334155;">Van Profile</a>
-        <a href="/logout" class="nav-auth-btn">Logout</a>
-      <% } else { %>
-        <span style="margin-right: 10px;">Welcome, <%= user.email %></span>
-        <a href="/dashboard" class="nav-auth-btn view-bookings-btn">View My Bookings</a>
-        <a href="/logout" class="nav-auth-btn">Logout</a>
-      <% } %>
-    </div>
-  </nav>
-
-  <!-- HOME CAROUSEL -->
-  <section id="home">
-  <div class="carousel-main">
-
-    <button id="prevBtn" class="carousel-btn left">&#10094;</button>
-
-
-
-    <div class="slides" id="homeSlides">
-      <img src="/images/home2.jpg" alt="Slide 1">
-      <img src="/images/home1.jpg" alt="Slide 2">
-      <img src="/images/home3.jpg" alt="Slide 3">
-      <img src="/images/home4.jpg" alt="Slide 4">
-      <img src="/images/home5.jpg" alt="Slide 5">
-    </div>
-
-    <button id="nextBtn" class="carousel-btn right">&#10095;</button>
-
-  </div>
-</section>
-
-  <!-- BOOKING + EXPLORE SECTION -->
-  <section class="booking-explore-section">
-    <!-- Booking Form -->
-    <div class="form-column">
-      <h2>Book Your Dream Vacation</h2>
-      <form id="bookForm">
-        <input type="hidden" id="csrfToken" name="_csrf" value="<%= csrfToken %>" />
-        <label for="destination">Destination</label>
-        <input type="text" id="destination" name="destination" required />
-
-        <label for="fromDate">From Date</label>
-        <input type="date" id="fromDate" name="fromDate" required />
-
-       <label for="toDate">To Date</label>
-       <input type="date" id="toDate" name="toDate" required />
-
-
-        <label for="people">Number of People</label>
-        <input type="number" id="people" name="people" min="1" max="10" required />
-
-        <label for="name">Full Name</label>
-        <input type="text" id="name" name="name" required />
-
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="email" required />
-
-        <label for="countryCode">Country Code</label>
-        <select id="countryCode" name="countryCode" required>
-          <option value="" disabled selected>Select</option>
-          <option value="+1">+1 (USA)</option>
-          <option value="+44">+44 (UK)</option>
-          <option value="+91">+91 (India)</option>
-        </select>
-
-        <label for="phone">Phone Number</label>
-        <input type="tel" id="phone" name="phone" required />
-
-        <label for="maritalStatus">Marital Status</label>
-        <select id="maritalStatus" name="maritalStatus" required>
-          <option value="" disabled selected>Select</option>
-          <option value="single">Single</option>
-          <option value="married">Married</option>
-        </select>
-
-        <button type="submit">Book Now</button>
-        <p id="formResponse" style="margin-top: 10px;"></p>
-      </form>
-    </div>
-
-    <!-- Travel Packages -->
-    <div class="packages-column">
-      <h2>Explore Our Travel Packages</h2>
-      <div class="packages-container">
-        <div class="package-card">
-          <img src="/images/home1.jpg" alt="Beach Getaway">
-          <h3>Beach Getaway</h3>
-          <p>Relax on the beaches of Bali.</p>
-          <button class="book-btn" data-destination="Beach Getaway">Book Now</button>
-        </div>
-        <div class="package-card">
-          <img src="/images/home2.jpg" alt="Mountain Adventure">
-          <h3>Mountain Adventure</h3>
-          <p>Hike the majestic Himalayas.</p>
-          <button class="book-btn" data-destination="Mountain Adventure">Book Now</button>
-        </div>
-        <div class="package-card">
-          <img src="/images/home3.jpg" alt="City Life">
-          <h3>City Life</h3>
-          <p>Explore vibrant New York.</p>
-          <button class="book-btn" data-destination="City Life">Book Now</button>
+        <div class="hero-image-card">
+          <img src="/images/home2.jpg" alt="Scenic mountain tour with spacious travel van" />
+          <div class="hero-floating-card">
+            <span style="font-size: 2rem;">🤝</span>
+            <div>
+              <div style="font-weight: 700; color: var(--primary-900); font-size: 0.95rem;">Direct Driver Contact</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Discuss fair pricing directly without middleman markups</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ABOUT SECTION -->
-  <section id="about" class="about-section">
-    <div class="about-images">
-      <img src="/images/home1.jpg" alt="About 1">
-      <img src="/images/home2.jpg" alt="About 2">
-    </div>
-    <div class="about-content">
-      <h2>About Us</h2>
-      <p>Destination Paradise curates luxury travel packages—beach, mountain, or city—perfectly tailored for you.</p>
-      <form id="about-form">
-        <select required>
-          <option value="">Choose your dream destination</option>
-          <option value="bali">Bali</option>
-          <option value="goa">Goa</option>
-          <option value="manali">Manali</option>
-          <option value="newyork">New York</option>
-        </select>
-        <button type="submit" class="submit-btn">Submit</button>
-      </form>
+  <!-- HOW IT WORKS SECTION -->
+  <section class="steps-section" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">Simple & Transparent</div>
+        <h2 class="section-title">How Destination Paradise Works</h2>
+        <p class="section-desc">A direct matching marketplace connecting vacationers and groups with verified vehicle operators.</p>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3 class="step-title">Submit Trip Request</h3>
+          <p class="step-desc">Specify your dream destination, travel dates, and group size. Your request enters our driver marketplace.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3 class="step-title">Driver Discovery</h3>
+          <p class="step-desc">Registered drivers whose scheduled availability and van seating capacity match your dates discover your trip.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3 class="step-title">Direct Agreement</h3>
+          <p class="step-desc">The driver contacts you directly via phone or WhatsApp. Discuss itinerary details and agree on fair pricing.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">4</div>
+          <h3 class="step-title">Trip Confirmed</h3>
+          <p class="step-desc">Once terms are settled, the driver accepts the trip on the platform, assigning their vehicle to your dashboard.</p>
+        </div>
+      </div>
     </div>
   </section>
 
-  <script>
-    document.querySelectorAll('.package-card .book-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+  <!-- TRUST & PLATFORM PRINCIPLES SECTION -->
+  <section class="trust-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">Built On Trust</div>
+        <h2 class="section-title">Why Travel With Destination Paradise?</h2>
+        <p class="section-desc">We eliminate corporate middleman fees so travelers save and local drivers earn fairly.</p>
+      </div>
+
+      <div class="trust-grid">
+        <div class="trust-card">
+          <div class="trust-icon">📋</div>
+          <h3>Registered Driver Profiles</h3>
+          <p>Every driver profile records license details, vehicle plate number, van model, and seating capacity.</p>
+        </div>
+
+        <div class="trust-card">
+          <div class="trust-icon">📅</div>
+          <h3>Date & Capacity Matching</h3>
+          <p>Drivers only see trip requests that strictly match their scheduled availability dates and van capacity.</p>
+        </div>
+
+        <div class="trust-card">
+          <div class="trust-icon">💬</div>
+          <h3>Direct Communication</h3>
+          <p>Talk directly with your assigned driver before confirming. Discuss custom stops, luggage space, and pickup timing.</p>
+        </div>
+
+        <div class="trust-card">
+          <div class="trust-icon">🛡️</div>
+          <h3>Zero Platform Processing Fees</h3>
+          <p>We do not hold or cut payments. Payment arrangements are made directly between travelers and drivers.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POPULAR PACKAGES SECTION -->
+  <section class="packages-section" id="packages">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">Inspiration</div>
+        <h2 class="section-title">Popular Travel Packages</h2>
+        <p class="section-desc">Choose a popular route to pre-fill your trip request or build your custom itinerary below.</p>
+      </div>
+
+      <div class="packages-grid">
+        <div class="package-card">
+          <img src="/images/home1.jpg" alt="Sunny tropical beach destination" class="package-image" />
+          <div class="package-body">
+            <div>
+              <h3>Coastal Beach Getaway</h3>
+              <p>Relax on serene beaches with scenic coastal road drives. Ideal for family vacations and groups.</p>
+            </div>
+            <button type="button" class="btn btn-outline btn-block select-pkg-btn" data-destination="Coastal Beach Getaway">
+              Select Package &rarr;
+            </button>
+          </div>
+        </div>
+
+        <div class="package-card">
+          <img src="/images/home2.jpg" alt="Majestic mountains and highland roads" class="package-image" />
+          <div class="package-body">
+            <div>
+              <h3>Mountain & Highland Tour</h3>
+              <p>Climb majestic mountain roads with experienced local van drivers who know the regional passes.</p>
+            </div>
+            <button type="button" class="btn btn-outline btn-block select-pkg-btn" data-destination="Mountain & Highland Tour">
+              Select Package &rarr;
+            </button>
+          </div>
+        </div>
+
+        <div class="package-card">
+          <img src="/images/home3.jpg" alt="Vibrant heritage and city sights" class="package-image" />
+          <div class="package-body">
+            <div>
+              <h3>Heritage & City Expedition</h3>
+              <p>Explore cultural landmarks, historic monuments, and vibrant local cuisine with comfortable group transit.</p>
+            </div>
+            <button type="button" class="btn btn-outline btn-block select-pkg-btn" data-destination="Heritage & City Expedition">
+              Select Package &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOKING SECTION -->
+  <section class="booking-section" id="booking">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">Request a Van</div>
+        <h2 class="section-title">Submit Your Trip Request</h2>
+        <p class="section-desc">Tell us where you want to go. Matching drivers will discover your trip and reach out.</p>
+      </div>
+
+      <div class="booking-form-card">
+        <div class="booking-notice">
+          <span style="font-size: 1.25rem;">ℹ️</span>
+          <p>
+            <strong>How it works:</strong> After submitting, your trip request becomes visible to registered van drivers matching your dates and group size. Drivers contact you directly to agree on pricing.
+          </p>
+        </div>
+
+        <form id="bookForm">
+          <input type="hidden" id="csrfToken" name="_csrf" value="<%= csrfToken %>" />
+
+          <!-- SECTION 1: TRIP DETAILS -->
+          <div class="form-section-title">
+            <span>🗺️</span> 1. Trip Itinerary
+          </div>
+
+          <div class="form-group">
+            <label for="destination">Destination *</label>
+            <input type="text" id="destination" name="destination" class="form-control" placeholder="e.g. Goa, Manali, Ooty, Hampi" required />
+            <div class="form-hint">Enter the primary destination or region of your trip.</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fromDate">Start Date *</label>
+              <input type="date" id="fromDate" name="fromDate" class="form-control" required />
+            </div>
+
+            <div class="form-group">
+              <label for="toDate">Return Date *</label>
+              <input type="date" id="toDate" name="toDate" class="form-control" required />
+            </div>
+
+            <div class="form-group">
+              <label for="people">Number of Passengers *</label>
+              <input type="number" id="people" name="people" class="form-control" min="1" max="20" placeholder="e.g. 4" required />
+            </div>
+          </div>
+
+          <!-- SECTION 2: CONTACT DETAILS -->
+          <div class="form-section-title">
+            <span>👤</span> 2. Traveler Contact Details
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="name">Full Name *</label>
+              <input type="text" id="name" name="name" class="form-control" placeholder="Lead traveler full name" required />
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email Address *</label>
+              <input type="email" id="email" name="email" class="form-control" value="<%= (typeof user !== 'undefined' && user) ? user.email : '' %>" placeholder="name@example.com" required />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex: 0.8;">
+              <label for="countryCode">Country Code *</label>
+              <select id="countryCode" name="countryCode" class="form-select" required>
+                <option value="+91" selected>+91 (India)</option>
+                <option value="+1">+1 (USA/Canada)</option>
+                <option value="+44">+44 (UK)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="flex: 1.2;">
+              <label for="phone">Phone / WhatsApp Number *</label>
+              <input type="tel" id="phone" name="phone" class="form-control" placeholder="e.g. 9876543210" required />
+              <div class="form-hint">Drivers will use this number to contact you regarding trip details.</div>
+            </div>
+
+            <div class="form-group">
+              <label for="maritalStatus">Group / Marital Status *</label>
+              <select id="maritalStatus" name="maritalStatus" class="form-select" required>
+                <option value="single" selected>Individual / Friends</option>
+                <option value="married">Family / Married</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary btn-lg btn-block">
+              Submit Trip Request
+            </button>
+          </div>
+
+          <div id="formResponse" style="margin-top: 1.25rem; font-weight: 600; font-size: 0.95rem; text-align: center;"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="/js/booking.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // Package selector pre-fill
+    document.querySelectorAll(".select-pkg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
         const dest = btn.dataset.destination;
-        document.getElementById('destination').value = dest;
-        document.getElementById('destination').focus();
-        window.scrollTo({ top: document.getElementById('bookForm').offsetTop - 100, behavior: 'smooth' });
+        const destInput = document.getElementById("destination");
+        if (destInput) {
+          destInput.value = dest;
+          destInput.focus();
+          const bookSection = document.getElementById("booking");
+          if (bookSection) {
+            bookSection.scrollIntoView({ behavior: "smooth" });
+          }
+        }
       });
     });
+  });
+</script>
 
-    document.getElementById("about-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const dest = e.target.querySelector("select").value;
-      alert(`You selected: ${dest}`);
-    });
-
-    const homeSlides = document.getElementById("homeSlides");
-const slides = homeSlides.children;
-
-let homeIndex = 0;
-
-function showSlide(index) {
-    homeSlides.style.transform = `translateX(-${index * 100}%)`;
-}
-
-// Auto Slide
-let autoSlide = setInterval(nextSlide, 2000);
-
-const carousel = document.querySelector(".carousel-main");
-
-carousel.addEventListener("mouseenter", () => {
-    clearInterval(autoSlide);
-});
-
-carousel.addEventListener("mouseleave", () => {
-    autoSlide = setInterval(nextSlide, 2000);
-});
-
-function nextSlide() {
-    homeIndex = (homeIndex + 1) % slides.length;
-    showSlide(homeIndex);
-}
-
-function prevSlide() {
-    homeIndex = (homeIndex - 1 + slides.length) % slides.length;
-    showSlide(homeIndex);
-}
-
-// Next Button
-document.getElementById("nextBtn").addEventListener("click", () => {
-    nextSlide();
-
-    clearInterval(autoSlide);
-    autoSlide = setInterval(nextSlide, 2000);
-});
-
-// Previous Button
-document.getElementById("prevBtn").addEventListener("click", () => {
-    prevSlide();
-
-    clearInterval(autoSlide);
-    autoSlide = setInterval(nextSlide, 2000);
-});
-    // Set min date to tomorrow in date input
-const dateInput = document.getElementById("dates");
-if (dateInput) {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  dateInput.min = tomorrow.toISOString().split("T")[0];
-}
-
-  </script>
-</body>
-</html>
+<%- include('partials/footer') %>

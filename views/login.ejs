@@ -1,97 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login | Destination Paradise</title>
-  <style>
-  body {
-  font-family: Arial, sans-serif;
-  background: url('images/home3.jpg') no-repeat center center fixed;
-  background-size: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  margin: 0;
-}
+<%- include('partials/head', { title: 'Tourist Login' }) %>
+<%- include('partials/navbar', { activePage: 'login' }) %>
 
-.login-container {
-  background: rgba(255, 255, 255, 0.15); /* translucent white */
-  backdrop-filter: blur(10px);           /* glass effect */
-  -webkit-backdrop-filter: blur(10px);   /* Safari support */
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  width: 320px;
-  color: #fff; /* Text color light on dark background */
-}
+<main style="padding: 3.5rem 0; min-height: 75vh; display: flex; align-items: center;">
+  <div class="container container-narrow">
+    <div class="card" style="max-width: 440px; margin: 0 auto; padding: 2.5rem; box-shadow: var(--shadow-md);">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div class="brand-icon" style="margin: 0 auto 1rem; width: 48px; height: 48px; font-size: 1.5rem;">
+          🌴
+        </div>
+        <h1 style="font-size: 1.6rem; color: var(--primary-900);">Traveler Login</h1>
+        <p style="font-size: 0.92rem; color: var(--text-muted); margin-top: 4px;">
+          Sign in to manage your trip requests and driver connections.
+        </p>
+      </div>
 
-h2 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: #ffffff;
-}
+      <%- include('partials/flash') %>
 
-input {
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #333;
-}
+      <form action="/login" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-input::placeholder {
-  color: #666;
-}
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="name@example.com" required autocomplete="email" />
+        </div>
 
-button {
-  width: 100%;
-  padding: 0.6rem;
-  background: #e91e63;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background 0.3s ease;
-}
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required autocomplete="current-password" />
+        </div>
 
-button:hover {
-  background: #d81b60;
-}
+        <div style="margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            Sign In as Traveler
+          </button>
+        </div>
+      </form>
 
-p {
-  text-align: center;
-  margin-top: 1rem;
-  color: #ffffff;
-}
-
-a {
-  color: #ffccf9;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-  </style>
-</head>
-<body>
-  <div class="login-container">
-    <h2>Login</h2>
-    <form action="/login" method="POST">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <!-- ✅ Add 'name' attributes -->
-      <input type="email" id="email" name="email" placeholder="Email" required />
-      <input type="password" id="password" name="password" placeholder="Password" required />
-      <button type="submit">Login</button>
-    </form>
-    <p>Don’t have an account? <a href="/register">Register</a></p>
-    <p style="font-size: 0.88rem; margin-top: 0.5rem;">Are you a Van Driver? <a href="/driver/login">Driver Portal</a></p>
+      <div style="margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: center;">
+        <p style="font-size: 0.9rem; color: var(--text-muted);">
+          Don't have an account yet? 
+          <a href="/register" style="font-weight: 700; color: var(--primary-600);">Register here</a>
+        </p>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 0.75rem;">
+          Are you a van driver? 
+          <a href="/driver/login" style="font-weight: 700; color: var(--teal-600);">Go to Driver Portal &rarr;</a>
+        </p>
+      </div>
+    </div>
   </div>
-</body>
-</html>
+</main>
+
+<%- include('partials/footer') %>

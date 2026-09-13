@@ -1,152 +1,269 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>My Bookings</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      color: #333;
-      padding: 2rem;
-    }
-    h2 {
-      margin-bottom: 1rem;
-    }
-    button {
-      background: #e91e63;
-      color: white;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 2rem;
-    }
-    button:hover {
-      background: #c2185b;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 12px 16px;
-      border: 1px solid #ddd;
-      text-align: left;
-    }
-    th {
-      background-color: #ffe4ec;
-    }
-  </style>
-</head>
-<body>
-  <h2>Welcome, <%= user.email %></h2>
-  <div style="display: flex; gap: 10px; margin-bottom: 2rem;">
-    <button onclick="window.location.href='/'" style="background: #333;">&larr; Back to Home</button>
-    <button onclick="window.location.href='/logout'">Logout</button>
-  </div>
+<%- include('partials/head', { title: 'My Trips Dashboard' }) %>
+<%- include('partials/navbar', { activePage: 'dashboard' }) %>
 
-  <h2>Your Bookings</h2>
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container">
+    <%- include('partials/flash') %>
 
-  <% if (bookings.length === 0) { %>
-    <p>No bookings yet.</p>
-  <% } else { %>
-    <div style="overflow-x: auto; width: 100%; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.08);">
-    <table>
-  <thead>
-    <tr>
-      <th>Destination</th>
-      <th>From</th>
-      <th>To</th>
-      <th>People</th>
-      <th>Name</th>
-      <th>Phone</th>
-      <th>Status</th>
-      <th>Assigned Driver & Vehicle</th>
-      <th>Booked At</th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% bookings.forEach((b) => { %>
-      <tr>
-        <td style="font-weight: 600;"><%= b.destination %></td>
-        <td><%= b.fromDate %></td>
-        <td><%= b.toDate %></td>
-        <td><%= b.people %></td>
-        <td><%= b.name %></td>
-        <td><%= b.countryCode %> <%= b.phone %></td>
-        <td>
-          <% if (b.status === "Requested") { %>
-            <span style="color:#92400e; font-weight:700; background:#fef3c7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
-              🟡 Looking for Driver
-            </span>
-          <% } else if (b.status === "Accepted") { %>
-            <span style="color:#166534; font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
-              🟢 Driver Assigned
-            </span>
-          <% } else if (b.status === "Confirmed") { %>
-            <span style="color:#15803d; font-weight:700; background:#f0fdf4; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
-              ✅ Confirmed
-            </span>
-          <% } else if (b.status === "Cancelled") { %>
-            <span style="color:#b91c1c; font-weight:700; background:#fef2f2; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
-              ❌ Cancelled
-            </span>
-          <% } else { %>
-            <span style="font-weight:700;"><%= b.status %></span>
-          <% } %>
-        </td>
-        <td>
-          <% if (b.status === "Accepted" && b.driverName) { %>
-            <div style="font-size: 0.88rem; line-height: 1.4;">
-              <strong style="color: #1e293b;"><%= b.driverName %></strong><br/>
-              <span style="color: #475569;">&#128222; <a href="tel:<%= b.driverPhone %>" style="color: #0284c7; text-decoration: none; font-weight: 600;"><%= b.driverPhone %></a></span><br/>
-              <span style="color: #64748b;">&#128656; <%= b.vanModel %> (<%= b.vanNumber %>)</span><br/>
-              <span style="color: #94a3b8; font-size: 0.8rem;">Seats: <%= b.seatingCapacity %></span>
+    <!-- TOP WELCOME BAR -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <h1 style="font-size: 1.85rem; color: var(--primary-900);">
+          Welcome back, <%= user.name || user.email.split('@')[0] %>
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Track your travel requests, view assigned driver details, and manage your journeys.
+        </p>
+      </div>
+      <div>
+        <a href="/#booking" class="btn btn-primary">+ Request a New Trip</a>
+      </div>
+    </div>
+
+    <% 
+      const totalTrips = bookings.length;
+      const requestedTrips = bookings.filter(b => b.status === "Requested").length;
+      const acceptedTrips = bookings.filter(b => b.status === "Accepted").length;
+      const cancelledTrips = bookings.filter(b => b.status === "Cancelled").length;
+      const activeTrip = bookings.find(b => b.status === "Requested" || b.status === "Accepted");
+    %>
+
+    <!-- SUMMARY METRIC CARDS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Requests</div>
+          <div class="stat-value"><%= totalTrips %></div>
+        </div>
+        <div class="stat-icon">🧳</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Looking for Driver</div>
+          <div class="stat-value" style="color: var(--primary-600);"><%= requestedTrips %></div>
+        </div>
+        <div class="stat-icon">⏳</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Driver Assigned</div>
+          <div class="stat-value" style="color: var(--teal-600);"><%= acceptedTrips %></div>
+        </div>
+        <div class="stat-icon">🚐</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Cancelled</div>
+          <div class="stat-value" style="color: var(--text-muted);"><%= cancelledTrips %></div>
+        </div>
+        <div class="stat-icon">✖️</div>
+      </div>
+    </div>
+
+    <!-- FEATURED ACTIVE TRIP / CURRENT REQUEST -->
+    <% if (activeTrip) { %>
+      <div class="active-trip-hero">
+        <div class="active-trip-header">
+          <div>
+            <div style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--teal-500); font-weight: 700; margin-bottom: 4px;">
+              Active Travel Request
             </div>
-          <% } else if (b.status === "Requested") { %>
-            <span style="color: #64748b; font-style: italic;">Not assigned yet</span>
-          <% } else if (b.status === "Cancelled") { %>
-            <% if (b.driverName) { %>
-              <div style="font-size: 0.82rem; color: #94a3b8;">
-                <span style="text-decoration: line-through;"><%= b.driverName %></span>
-                <div>(Trip Cancelled)</div>
-              </div>
-            <% } else { %>
-              <span style="color: #94a3b8; font-style: italic;">None</span>
+            <h2>🌴 <%= activeTrip.destination %></h2>
+          </div>
+          <div>
+            <% if (activeTrip.status === "Requested") { %>
+              <span class="badge" style="background: rgba(254, 243, 199, 0.95); color: #92400e; font-size: 0.9rem; padding: 6px 14px;">
+                🟡 Looking for Driver
+              </span>
+            <% } else if (activeTrip.status === "Accepted") { %>
+              <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 0.9rem; padding: 6px 14px;">
+                🟢 Driver Assigned
+              </span>
             <% } %>
-          <% } else { %>
-            <span style="color: #64748b; font-style: italic;">Package Booking</span>
-          <% } %>
-        </td>
-        <td><%= b.bookedAt %></td>
-        <td>
-          <% if (b.status !== "Cancelled") { %>
-            <form action="/cancel-booking/<%= b.id %>" method="POST">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button
-                type="submit"
-                onclick="return confirm('Cancel this trip request?');"
-                style="background:#dc3545; padding: 6px 12px; font-size: 0.85rem; margin-bottom: 0;">
-                Cancel Request
-              </button>
-            </form>
-          <% } else { %>
-            <button disabled style="background:gray; padding: 6px 12px; font-size: 0.85rem; margin-bottom: 0;">
-              Cancelled
-            </button>
-          <% } %>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-</div>
+          </div>
+        </div>
 
-  <% } %>
-</body>
-</html>
+        <div class="active-trip-grid">
+          <!-- TRIP ITINERARY DETAILS -->
+          <div class="trip-meta-box">
+            <div class="trip-meta-row">
+              <span style="font-size: 1.2rem;">📅</span>
+              <span><strong>Dates:</strong> <%= activeTrip.fromDate %> &rarr; <%= activeTrip.toDate %></span>
+            </div>
+            <div class="trip-meta-row">
+              <span style="font-size: 1.2rem;">👥</span>
+              <span><strong>Travelers:</strong> <%= activeTrip.people %> Passenger<%= activeTrip.people === 1 ? '' : 's' %></span>
+            </div>
+            <div class="trip-meta-row">
+              <span style="font-size: 1.2rem;">👤</span>
+              <span><strong>Lead Traveler:</strong> <%= activeTrip.name %> (<%= activeTrip.countryCode %> <%= activeTrip.phone %>)</span>
+            </div>
+            <div class="trip-meta-row">
+              <span style="font-size: 1.2rem;">🕒</span>
+              <span style="font-size: 0.88rem; color: #cbd5e1;"><strong>Submitted:</strong> <%= activeTrip.bookedAt %></span>
+            </div>
+
+            <div style="margin-top: 1rem;">
+              <form action="/cancel-booking/<%= activeTrip.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this trip request?');">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-outline btn-sm" style="color: #fecaca; border-color: rgba(254, 202, 202, 0.3);">
+                  Cancel Request
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- ASSIGNED DRIVER DETAILS / PENDING MATCHING STATE -->
+          <% if (activeTrip.status === "Accepted" && activeTrip.driverName) { %>
+            <% 
+              const waClean = ((activeTrip.driverPhone || '').replace(/[^0-9]/g, ''));
+            %>
+            <div class="driver-assigned-box">
+              <div class="driver-assigned-title">
+                ✓ Assigned Van Driver
+              </div>
+              <div class="driver-name-lg">
+                <%= activeTrip.driverName %>
+              </div>
+              <div class="driver-vehicle-info">
+                <div>🚐 <strong><%= activeTrip.vanModel %></strong></div>
+                <div>Plate: <strong style="color: #fff;"><%= activeTrip.vanNumber %></strong> (<%= activeTrip.seatingCapacity %> Seats)</div>
+                <div style="margin-top: 4px; font-size: 0.85rem; color: #94a3b8;">Registered Van Driver</div>
+              </div>
+
+              <div class="driver-contact-actions">
+                <a href="tel:<%= activeTrip.driverPhone %>" class="btn btn-secondary btn-sm" style="flex: 1;">
+                  📞 Call Driver
+                </a>
+                <% if (waClean) { %>
+                  <a href="https://wa.me/<%= waClean %>?text=Hello%20<%= encodeURIComponent(activeTrip.driverName) %>,%20I%20am%20the%20traveler%20for%20the%20Destination%20Paradise%20trip%20to%20<%= encodeURIComponent(activeTrip.destination) %>." target="_blank" class="btn btn-primary btn-sm" style="background-color: #25d366; border-color: #25d366; flex: 1;">
+                    💬 WhatsApp
+                  </a>
+                <% } %>
+              </div>
+            </div>
+          <% } else { %>
+            <div class="driver-assigned-box" style="border-style: dashed;">
+              <div class="driver-assigned-title" style="color: #fef08a;">
+                ⏳ Driver Search In Progress
+              </div>
+              <p style="color: #e2e8f0; font-size: 0.92rem; line-height: 1.5; margin: 0.5rem 0 1rem;">
+                Your trip is visible in our driver marketplace. Available van drivers with matching capacity will contact you directly via phone or WhatsApp to agree on pricing.
+              </p>
+              <div style="font-size: 0.82rem; color: #94a3b8;">
+                • Registered local drivers<br/>
+                • Verified capacity matching
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- COMPLETE TRIP HISTORY -->
+    <div style="margin-top: 2.5rem;">
+      <h2 style="font-size: 1.35rem; color: var(--primary-900); margin-bottom: 1.25rem;">
+        Trip History & Requests (<%= totalTrips %>)
+      </h2>
+
+      <% if (bookings.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-icon">🏖️</div>
+          <h3 class="empty-title">No trip requests yet</h3>
+          <p class="empty-desc">You haven't requested any vacation trips yet. Plan your dream trip and connect with experienced local van drivers.</p>
+          <a href="/#booking" class="btn btn-primary">Plan Your First Trip &rarr;</a>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Destination</th>
+                <th>Dates</th>
+                <th>Travelers</th>
+                <th>Status</th>
+                <th>Assigned Driver & Vehicle</th>
+                <th>Submitted</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% bookings.forEach((b) => { %>
+                <tr>
+                  <td style="font-weight: 700; color: var(--primary-900);"><%= b.destination %></td>
+                  <td style="white-space: nowrap;"><%= b.fromDate %> &rarr; <%= b.toDate %></td>
+                  <td><%= b.people %> Person<%= b.people === 1 ? '' : 's' %></td>
+                  <td>
+                    <% if (b.status === "Requested") { %>
+                      <span style="color:#92400e; font-weight:700; background:#fef3c7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
+                        🟡 Looking for Driver
+                      </span>
+                    <% } else if (b.status === "Accepted") { %>
+                      <span style="color:#166534; font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
+                        🟢 Driver Assigned
+                      </span>
+                    <% } else if (b.status === "Confirmed") { %>
+                      <span style="color:#15803d; font-weight:700; background:#f0fdf4; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
+                        ✅ Confirmed
+                      </span>
+                    <% } else if (b.status === "Cancelled") { %>
+                      <span style="color:#b91c1c; font-weight:700; background:#fef2f2; padding:4px 8px; border-radius:12px; font-size:0.85rem; display:inline-block; white-space:nowrap;">
+                        ❌ Cancelled
+                      </span>
+                    <% } else { %>
+                      <span style="font-weight:700;"><%= b.status %></span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (b.status === "Accepted" && b.driverName) { %>
+                      <div style="font-size: 0.88rem; line-height: 1.4;">
+                        <strong style="color: var(--primary-900);"><%= b.driverName %></strong><br/>
+                        <span style="color: var(--text-muted);">📞 <a href="tel:<%= b.driverPhone %>" style="color: var(--primary-600); font-weight: 600;"><%= b.driverPhone %></a></span><br/>
+                        <span style="color: var(--text-muted);">🚐 <%= b.vanModel %> (<%= b.vanNumber %>)</span>
+                      </div>
+                    <% } else if (b.status === "Requested") { %>
+                      <span style="color: var(--text-muted); font-style: italic;">Matching in progress</span>
+                    <% } else if (b.status === "Cancelled") { %>
+                      <% if (b.driverName) { %>
+                        <div style="font-size: 0.82rem; color: var(--text-muted);">
+                          <span style="text-decoration: line-through;"><%= b.driverName %></span>
+                          <div>(Cancelled)</div>
+                        </div>
+                      <% } else { %>
+                        <span style="color: var(--text-muted); font-style: italic;">None</span>
+                      <% } %>
+                    <% } else { %>
+                      <span style="color: var(--text-muted); font-style: italic;">Package Booking</span>
+                    <% } %>
+                  </td>
+                  <td style="font-size: 0.85rem; color: var(--text-muted); white-space: nowrap;"><%= b.bookedAt %></td>
+                  <td>
+                    <% if (b.status !== "Cancelled") { %>
+                      <form action="/cancel-booking/<%= b.id %>" method="POST">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button
+                          type="submit"
+                          onclick="return confirm('Are you sure you want to cancel this trip request?');"
+                          class="btn btn-outline btn-sm"
+                          style="color: #dc2626; border-color: #fca5a5;">
+                          Cancel Request
+                        </button>
+                      </form>
+                    <% } else { %>
+                      <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">Cancelled</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

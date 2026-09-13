@@ -93,17 +93,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await response.json();
 
       if (response.ok) {
-        resDiv.textContent = "✅ " + (result.message || "Booking successful!");
-        resDiv.style.color = "green";
+        resDiv.innerHTML = `<div class="flash-alert flash-success" style="margin: 0;">✅ ${result.message || "Trip request submitted successfully!"}</div>`;
         form.reset();
+      } else if (response.status === 401) {
+        resDiv.innerHTML = `<div class="flash-alert flash-error" style="margin: 0;">⚠️ <strong>Login Required:</strong> Please <a href="/login" style="text-decoration: underline; color: inherit; font-weight: 700;">log in to your tourist account</a> to submit a trip request.</div>`;
       } else {
-        resDiv.textContent = `❌ ${result.message || "Booking failed."}`;
-        resDiv.style.color = "red";
+        resDiv.innerHTML = `<div class="flash-alert flash-error" style="margin: 0;">❌ ${result.message || "Unable to submit trip request."}</div>`;
       }
     } catch (error) {
       console.error("Error during booking:", error);
-      resDiv.textContent = "❌ Network error. Please try again.";
-      resDiv.style.color = "red";
+      resDiv.innerHTML = `<div class="flash-alert flash-error" style="margin: 0;">❌ Network connection error. Please try again.</div>`;
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;

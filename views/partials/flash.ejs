@@ -1,0 +1,26 @@
+<% 
+  const flashSuccess = (typeof successMessage !== 'undefined' && successMessage) || 
+                       (typeof msg !== 'undefined' && msg) || 
+                       (typeof req !== 'undefined' && req.query && req.query.msg) || null;
+  const flashError = (typeof errorMessage !== 'undefined' && errorMessage) || 
+                     (typeof err !== 'undefined' && err) || 
+                     (typeof req !== 'undefined' && req.query && req.query.err) || null;
+%>
+
+<% if (flashSuccess || flashError) { %>
+  <div class="flash-container">
+    <% if (flashSuccess) { %>
+      <div class="flash-alert flash-success flash-dismissible" role="alert">
+        <div><%= flashSuccess %></div>
+        <button type="button" class="flash-close" aria-label="Close message">&times;</button>
+      </div>
+    <% } %>
+    <% if (flashError) { %>
+      <div class="flash-alert flash-error flash-dismissible" role="alert">
+        <div><%= flashError %></div>
+        <button type="button" class="flash-close" aria-label="Close message">&times;</button>
+      </div>
+    <% } %>
+  </div>
+<% } %>
+

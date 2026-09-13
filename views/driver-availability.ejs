@@ -1,503 +1,189 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Driver Availability | Destination Paradise</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    body {
-      background-color: #f7f9fc;
-      color: #333;
-      min-height: 100vh;
-    }
-    /* NAVBAR */
-    .driver-nav {
-      background-color: #1e293b;
-      color: #fff;
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .driver-nav .brand {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #f06292;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-    }
-    .driver-nav .brand span {
-      background: #e91e63;
-      color: white;
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-    }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 1.2rem;
-      flex-wrap: wrap;
-    }
-    .nav-links a {
-      color: #e2e8f0;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 0.95rem;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover, .nav-links a.active {
-      color: #f06292;
-    }
-    .logout-btn {
-      background: #dc2626;
-      color: white;
-      padding: 6px 14px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.88rem;
-    }
+<%- include('partials/head', { title: 'Driver Availability' }) %>
+<%- include('partials/navbar', { activePage: 'availability' }) %>
 
-    /* CONTAINER */
-    .container {
-      max-width: 1000px;
-      margin: 2.5rem auto;
-      padding: 0 1.5rem;
-    }
-    .page-header {
-      margin-bottom: 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .page-header h1 {
-      font-size: 1.8rem;
-      color: #0f172a;
-    }
-    .page-header p {
-      color: #64748b;
-      font-size: 0.95rem;
-      margin-top: 4px;
-    }
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container" style="max-width: 1000px;">
+    <%- include('partials/flash') %>
 
-    /* ALERTS */
-    .alert-success {
-      background: #dcfce7;
-      color: #166534;
-      padding: 12px 18px;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      font-weight: 600;
-      font-size: 0.95rem;
-      border: 1px solid #bbf7d0;
-    }
-    .alert-error {
-      background: #fee2e2;
-      color: #991b1b;
-      padding: 12px 18px;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      font-weight: 600;
-      font-size: 0.95rem;
-      border: 1px solid #fecaca;
-    }
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <h1 style="font-size: 1.85rem; color: var(--primary-900);">
+          Manage Availability Schedule
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Define specific date windows when you and your vehicle are available to accept tourist bookings.
+        </p>
+      </div>
 
-    /* ADD AVAILABILITY CARD */
-    .card {
-      background: white;
-      border-radius: 14px;
-      padding: 1.8rem 2rem;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
-      margin-bottom: 2.5rem;
-    }
-    .card h2 {
-      font-size: 1.25rem;
-      color: #0f172a;
-      margin-bottom: 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .add-form {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto;
-      gap: 1.2rem;
-      align-items: flex-end;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-    .form-group label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 0.4rem;
-    }
-    .form-group input, .form-group select {
-      padding: 0.7rem 0.85rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      color: #1e293b;
-      background: #f8fafc;
-      transition: all 0.2s;
-    }
-    .form-group input:focus, .form-group select:focus {
-      outline: none;
-      border-color: #e91e63;
-      background: #fff;
-      box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.15);
-    }
-    .btn-add {
-      background: #e91e63;
-      color: white;
-      padding: 0.75rem 1.6rem;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      height: 44px;
-      white-space: nowrap;
-    }
-    .btn-add:hover {
-      background: #d81b60;
-    }
-
-    /* AVAILABILITY LIST TABLE */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-    }
-    th, td {
-      padding: 14px 16px;
-      text-align: left;
-      border-bottom: 1px solid #f1f5f9;
-      font-size: 0.95rem;
-    }
-    th {
-      background: #f8fafc;
-      color: #64748b;
-      font-weight: 600;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    tr:hover {
-      background-color: #fafbfc;
-    }
-
-    /* BADGES */
-    .badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .badge-available {
-      background: #dcfce7;
-      color: #166534;
-    }
-    .badge-unavailable {
-      background: #f1f5f9;
-      color: #64748b;
-    }
-
-    /* ACTIONS */
-    .actions-cell {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .btn-action {
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-      text-decoration: none;
-      display: inline-block;
-    }
-    .btn-toggle {
-      background: #f1f5f9;
-      color: #334155;
-    }
-    .btn-toggle:hover {
-      background: #e2e8f0;
-    }
-    .btn-edit {
-      background: #e0f2fe;
-      color: #0369a1;
-    }
-    .btn-edit:hover {
-      background: #bae6fd;
-    }
-    .btn-delete {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-    .btn-delete:hover {
-      background: #fecaca;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1rem;
-      color: #64748b;
-    }
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 0.8rem;
-    }
-
-    /* MODAL FOR EDIT */
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .modal.active {
-      display: flex;
-    }
-    .modal-content {
-      background: white;
-      border-radius: 14px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-      padding-bottom: 0.8rem;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .modal-header h3 {
-      font-size: 1.25rem;
-      color: #0f172a;
-    }
-    .close-btn {
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #94a3b8;
-    }
-    .close-btn:hover {
-      color: #0f172a;
-    }
-    .modal-form .form-group {
-      margin-bottom: 1.2rem;
-    }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 1.5rem;
-    }
-    .btn-cancel {
-      background: #f1f5f9;
-      color: #475569;
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-save {
-      background: #e91e63;
-      color: white;
-      padding: 8px 20px;
-      border-radius: 8px;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-save:hover {
-      background: #d81b60;
-    }
-  </style>
-</head>
-<body>
-
-<!-- NAVIGATION -->
-<nav class="driver-nav">
-  <a href="/driver/dashboard" class="brand">
-    Destination Paradise <span>DRIVER</span>
-  </a>
-  <div class="nav-links">
-    <a href="/driver/dashboard">Dashboard</a>
-    <a href="/driver/profile">Van Profile</a>
-    <a href="/driver/availability" class="active">Availability</a>
-    <a href="/driver/trips">Trip Requests</a>
-    <a href="/driver/my-trips">My Trips</a>
-    <a href="/logout" class="logout-btn">Logout</a>
-  </div>
-</nav>
-
-<div class="container">
-  <div class="page-header">
-    <div>
-      <h1>Manage Date-Based Availability</h1>
-      <p>Specify the date windows when you and your van are available for long-distance trips.</p>
+      <a href="/driver/dashboard" class="btn btn-outline btn-sm">
+        &larr; Back to Dashboard
+      </a>
     </div>
-    <a href="/driver/dashboard" style="color: #64748b; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+
+    <!-- ADD AVAILABILITY FORM CARD -->
+    <div class="card" style="margin-bottom: 2.5rem;">
+      <h2 style="font-size: 1.25rem; color: var(--primary-900); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px;">
+        <span>📅</span> Add New Availability Window
+      </h2>
+
+      <form action="/driver/availability" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 1.25rem; align-items: flex-end;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="form-group" style="margin: 0;">
+          <label for="fromDate" class="form-label">From Date *</label>
+          <input 
+            type="date" 
+            id="fromDate" 
+            name="fromDate" 
+            class="form-input" 
+            min="<%= todayStr %>" 
+            required 
+          />
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label for="toDate" class="form-label">To Date *</label>
+          <input 
+            type="date" 
+            id="toDate" 
+            name="toDate" 
+            class="form-input" 
+            min="<%= todayStr %>" 
+            required 
+          />
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label for="status" class="form-label">Initial Status *</label>
+          <select id="status" name="status" class="form-select" required>
+            <option value="available" selected>Available</option>
+            <option value="unavailable">Unavailable</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="height: 44px; white-space: nowrap;">
+          + Add Window
+        </button>
+      </form>
+    </div>
+
+    <!-- SCHEDULED PERIODS CARD -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h2 style="font-size: 1.25rem; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>📋</span> Scheduled Availability Windows
+        </h2>
+        <span class="badge badge-active" style="font-size: 0.8rem;">
+          <%= availabilities.length %> Period<%= availabilities.length === 1 ? '' : 's' %> Defined
+        </span>
+      </div>
+
+      <% if (availabilities.length === 0) { %>
+        <div class="empty-state" style="padding: 2.5rem 1rem;">
+          <div class="empty-state-icon">📆</div>
+          <h3 class="empty-state-title">No Availability Windows Scheduled</h3>
+          <p class="empty-state-desc">
+            You haven't defined any working dates yet. Add your upcoming available dates above so tourist requests can match with your profile.
+          </p>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Status</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% availabilities.forEach((period) => { %>
+                <tr>
+                  <td style="font-weight: 600; color: var(--primary-900);">
+                    📅 <%= period.fromDate %>
+                  </td>
+                  <td style="font-weight: 600; color: var(--primary-900);">
+                    📅 <%= period.toDate %>
+                  </td>
+                  <td>
+                    <% if (period.status === 'available') { %>
+                      <span class="badge badge-active">● Available</span>
+                    <% } else { %>
+                      <span class="badge badge-inactive">● Unavailable</span>
+                    <% } %>
+                  </td>
+                  <td style="text-align: right;">
+                    <div style="display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end;">
+                      <!-- TOGGLE STATUS -->
+                      <form action="/driver/availability/<%= period.availabilityId %>/toggle" method="POST" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-outline btn-sm" title="Toggle between available and unavailable">
+                          <%= period.status === 'available' ? 'Mark Unavailable' : 'Mark Available' %>
+                        </button>
+                      </form>
+
+                      <!-- EDIT MODAL TRIGGER -->
+                      <button 
+                        type="button" 
+                        class="btn btn-secondary btn-sm" 
+                        onclick="openEditModal('<%= period.availabilityId %>', '<%= period.fromDate %>', '<%= period.toDate %>', '<%= period.status %>')"
+                      >
+                        ✏️ Edit
+                      </button>
+
+                      <!-- DELETE ACTION -->
+                      <form action="/driver/availability/<%= period.availabilityId %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this availability window?');">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); border-color: #fecaca;">
+                          🗑️ Delete
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
   </div>
-
-  <% if (typeof successMessage !== 'undefined' && successMessage) { %>
-    <div class="alert-success"><%= successMessage %></div>
-  <% } %>
-
-  <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
-    <div class="alert-error"><%= errorMessage %></div>
-  <% } %>
-
-  <!-- ADD AVAILABILITY FORM -->
-  <div class="card">
-    <h2><span>📅</span> Add New Availability Window</h2>
-    <form action="/driver/availability" method="POST" class="add-form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <div class="form-group">
-        <label for="fromDate">From Date *</label>
-        <input type="date" id="fromDate" name="fromDate" min="<%= todayStr %>" required />
-      </div>
-
-      <div class="form-group">
-        <label for="toDate">To Date *</label>
-        <input type="date" id="toDate" name="toDate" min="<%= todayStr %>" required />
-      </div>
-
-      <div class="form-group">
-        <label for="status">Status *</label>
-        <select id="status" name="status" required>
-          <option value="available" selected>Available</option>
-          <option value="unavailable">Unavailable</option>
-        </select>
-      </div>
-
-      <button type="submit" class="btn-add">+ Add Period</button>
-    </form>
-  </div>
-
-  <!-- EXISTING AVAILABILITY PERIODS -->
-  <div class="card">
-    <h2><span>📋</span> Scheduled Availability Periods (<%= availabilities.length %>)</h2>
-
-    <% if (availabilities.length === 0) { %>
-      <div class="empty-state">
-        <div class="empty-icon">📆</div>
-        <p style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">No availability periods added yet.</p>
-        <p style="margin-top: 4px;">Use the form above to specify your working dates.</p>
-      </div>
-    <% } else { %>
-      <table>
-        <thead>
-          <tr>
-            <th>From Date</th>
-            <th>To Date</th>
-            <th>Status</th>
-            <th>Quick Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% availabilities.forEach((period) => { %>
-            <tr>
-              <td style="font-weight: 600; color: #0f172a;"><%= period.fromDate %></td>
-              <td style="font-weight: 600; color: #0f172a;"><%= period.toDate %></td>
-              <td>
-                <% if (period.status === 'available') { %>
-                  <span class="badge badge-available">Available</span>
-                <% } else { %>
-                  <span class="badge badge-unavailable">Unavailable</span>
-                <% } %>
-              </td>
-              <td class="actions-cell">
-                <!-- TOGGLE STATUS -->
-                <form action="/driver/availability/<%= period.availabilityId %>/toggle" method="POST" style="display:inline;">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button type="submit" class="btn-action btn-toggle" title="Toggle status between available and unavailable">
-                    <%= period.status === 'available' ? 'Mark Unavailable' : 'Mark Available' %>
-                  </button>
-                </form>
-
-                <!-- EDIT BUTTON -->
-                <button type="button" class="btn-action btn-edit" onclick="openEditModal('<%= period.availabilityId %>', '<%= period.fromDate %>', '<%= period.toDate %>', '<%= period.status %>')">
-                  Edit
-                </button>
-
-                <!-- DELETE BUTTON -->
-                <form action="/driver/availability/<%= period.availabilityId %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this availability window?');">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button type="submit" class="btn-action btn-delete">Delete</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    <% } %>
-  </div>
-</div>
+</main>
 
 <!-- EDIT MODAL -->
-<div id="editModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3>Edit Availability Window</h3>
-      <button class="close-btn" onclick="closeEditModal()">&times;</button>
+<div id="editModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div class="card" style="width: 100%; max-width: 480px; box-shadow: var(--shadow-xl); border: 1px solid var(--border-subtle); animation: modalFadeIn 0.2s ease-out;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--border-subtle);">
+      <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 0;">Edit Availability Window</h3>
+      <button type="button" onclick="closeEditModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1;">&times;</button>
     </div>
-    <form id="editForm" method="POST" class="modal-form">
+
+    <form id="editForm" method="POST">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
       <div class="form-group">
-        <label for="editFromDate">From Date *</label>
-        <input type="date" id="editFromDate" name="fromDate" min="<%= todayStr %>" required />
+        <label for="editFromDate" class="form-label">From Date *</label>
+        <input type="date" id="editFromDate" name="fromDate" class="form-input" min="<%= todayStr %>" required />
       </div>
 
       <div class="form-group">
-        <label for="editToDate">To Date *</label>
-        <input type="date" id="editToDate" name="toDate" min="<%= todayStr %>" required />
+        <label for="editToDate" class="form-label">To Date *</label>
+        <input type="date" id="editToDate" name="toDate" class="form-input" min="<%= todayStr %>" required />
       </div>
 
       <div class="form-group">
-        <label for="editStatus">Status *</label>
-        <select id="editStatus" name="status" required>
+        <label for="editStatus" class="form-label">Status *</label>
+        <select id="editStatus" name="status" class="form-select" required>
           <option value="available">Available</option>
           <option value="unavailable">Unavailable</option>
         </select>
       </div>
 
-      <div class="modal-actions">
-        <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
-        <button type="submit" class="btn-save">Save Changes</button>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
       </div>
     </form>
   </div>
@@ -507,18 +193,18 @@
   function openEditModal(id, from, to, status) {
     const modal = document.getElementById('editModal');
     const form = document.getElementById('editForm');
-    form.action = `/driver/availability/${id}/update`;
+    form.action = '/driver/availability/' + encodeURIComponent(id) + '/update';
     document.getElementById('editFromDate').value = from;
     document.getElementById('editToDate').value = to;
     document.getElementById('editStatus').value = status;
-    modal.classList.add('active');
+    modal.style.display = 'flex';
   }
 
   function closeEditModal() {
-    document.getElementById('editModal').classList.remove('active');
+    document.getElementById('editModal').style.display = 'none';
   }
 
-  // Close modal when clicking outside
+  // Close modal when clicking on backdrop
   window.onclick = function(event) {
     const modal = document.getElementById('editModal');
     if (event.target === modal) {
@@ -527,6 +213,4 @@
   };
 </script>
 
-</body>
-</html>
-
+<%- include('partials/footer') %>
