@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.env.*
+key.json
+*.pem
+*.key
+node_modules
+scratch
+*.log
+npm-debug.log*
+docs
+.gemini
+.DS_Store
+Thumbs.db

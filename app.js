@@ -13,7 +13,7 @@ const { doubleCsrf } = require("csrf-csrf");
 const path = require("path");
 const fs = require("fs");
 
-const { validateConfig } = require("./lib/config");
+const { validateConfig, parseTrustProxy } = require("./lib/config");
 const { logger, requestLogger } = require("./lib/logger");
 const { requestIdMiddleware } = require("./lib/request-id");
 const { FirestoreSessionStore } = require("./lib/session-store");
@@ -61,6 +61,13 @@ try {
 
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
+
+// Configure reverse proxy trust
+const trustProxyParsed = parseTrustProxy(process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : (isProd ? 1 : false));
+if (trustProxyParsed.valid && trustProxyParsed.parsedValue !== false) {
+  app.set("trust proxy", trustProxyParsed.parsedValue);
+  logger.info("Reverse proxy trust configured", { trustProxy: trustProxyParsed.parsedValue });
+}
 
 // ==========================================
 // OPERATIONAL INFRASTRUCTURE MIDDLEWARE

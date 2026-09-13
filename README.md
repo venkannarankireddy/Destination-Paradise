@@ -57,6 +57,12 @@ A production-grade, two-sided travel marketplace connecting travelers with verif
 - **Startup Configuration Validation:** Fast fail-safe startup checks detecting missing production credentials and enforcing 32+ char session secrets.
 - **Production Deployment Guide:** Complete operational and reverse proxy configuration manual documented in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
+### 🐳 Production Deployment & Operations (Phase 11)
+- **Containerization on Node.js 24 Alpine LTS:** Production multi-stage `Dockerfile` running as unprivileged non-root `USER node` (`UID 1000:1000`) with zero development secrets baked into image layers.
+- **Reverse Proxy Trust (`TRUST_PROXY`):** Hardened reverse proxy configuration (`TRUST_PROXY=1`) enabling secure cookies and client IP rate limiting behind ALBs and HTTPS proxies while preventing IP spoofing.
+- **Reproducible Production Builds:** Supply-chain security enforced via `npm ci --omit=dev --ignore-scripts` based on `package-lock.json`.
+- **Operational Runbook & Disaster Recovery:** Comprehensive operations manual, secret rotation protocols, and disaster recovery procedures in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
 ---
 
 ## 🔒 Security & Hardening Architecture
@@ -184,7 +190,13 @@ Access the application at `http://localhost:3000`.
 Execute the automated test suites against the running Express application and Firestore:
 
 ```bash
-# Phase 10 Production Infrastructure & Reliability Suite
+# Phase 11 Production Smoke Test Suite
+node scratch/test-phase11-smoke.js
+
+# Phase 11 Failure & Recovery Test Suite
+node scratch/test-phase11-failure.js
+
+# Phase 10 Production Infrastructure & Reliability Suite (52 tests)
 node scratch/test-phase10.js
 
 # Phase 9 Trip Lifecycle & Notification Suite (51 tests)

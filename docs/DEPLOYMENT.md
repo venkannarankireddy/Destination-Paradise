@@ -1,13 +1,15 @@
 # Destination Paradise — Production Deployment Guide
 
-This guide details the operational architecture, deployment requirements, and production hardening procedures for **Destination Paradise** (Phase 10).
+This guide details the operational architecture, deployment requirements, and production hardening procedures for **Destination Paradise** (Phases 10 & 11).
+
+For disaster recovery runbooks, secret rotation protocols, and detailed operational troubleshooting, consult [`docs/OPERATIONS.md`](OPERATIONS.md).
 
 ---
 
 ## 1. Runtime & System Requirements
 
-- **Runtime:** Node.js `>= 18.0.0` (LTS recommended, tested on Node.js v20 and v24).
-- **Process Manager:** `pm2`, `systemd`, or container orchestrators (Docker, Kubernetes, Google Cloud Run).
+- **Runtime:** Node.js 24 Alpine LTS (`node:24-alpine` for container deployments).
+- **Process Manager:** Container orchestrators (Docker, Kubernetes, Google Cloud Run) or `pm2` / `systemd`.
 - **Database:** Google Cloud Firestore (in Datastore Native or Firestore Native mode).
 - **Reverse Proxy / Load Balancer:** Nginx, AWS ALB, or Google Cloud HTTPS Load Balancer with SSL/TLS termination.
 
@@ -27,6 +29,7 @@ cp .env.example .env
 |---|---|---|---|
 | `NODE_ENV` | **YES** | `production` | Enables secure cookies, strict configuration validation, and single-line JSON logging. |
 | `PORT` | No | `3000` | HTTP port the Express server binds to (1–65535). |
+| `TRUST_PROXY` | Recommended | `1` | Number of upstream proxy hops (e.g. `1` for single ALB/Nginx proxy), boolean, or CIDR list. |
 | `SESSION_SECRET` | **YES** | None | **Must be at least 32 characters long.** Used to sign session cookies and derive CSRF secrets. Generate via `openssl rand -hex 32`. |
 | `FIREBASE_API_KEY` | **YES** | None | Web API Key from Firebase Console used for Google Identity Toolkit sign-up and sign-in operations. |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | Conditional | JSON string | JSON contents of your Firebase Service Account Private Key. (Alternative: `GOOGLE_APPLICATION_CREDENTIALS` path). |
