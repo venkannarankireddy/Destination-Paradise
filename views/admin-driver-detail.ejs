@@ -1,0 +1,281 @@
+<%- include('partials/head', { title: 'Review Driver: ' + driver.name }) %>
+<%- include('partials/navbar', { activePage: 'admin-drivers' }) %>
+
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container" style="max-width: 960px;">
+    <%- include('partials/flash') %>
+
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
+            <%= driver.name %>
+          </h1>
+          <% if (driver.verificationStatus === 'verified') { %>
+            <span class="badge badge-active" style="font-size: 0.85rem; padding: 4px 12px;">✓ Verified Driver</span>
+          <% } else if (driver.verificationStatus === 'rejected') { %>
+            <span class="badge badge-inactive" style="font-size: 0.85rem; padding: 4px 12px; background: #fee2e2; color: #991b1b;">✕ Verification Rejected</span>
+          <% } else { %>
+            <span class="badge badge-pending" style="font-size: 0.85rem; padding: 4px 12px;">⏳ Pending Verification</span>
+          <% } %>
+
+          <% if (driver.isActive) { %>
+            <span class="badge badge-active" style="font-size: 0.85rem;">🟢 Active</span>
+          <% } else { %>
+            <span class="badge badge-inactive" style="font-size: 0.85rem;">⏸️ Paused</span>
+          <% } %>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 6px;">
+          UID: <code style="font-size: 0.85rem; background: var(--bg-alt); padding: 2px 6px; border-radius: 4px;"><%= driver.id %></code>
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <a href="/admin/drivers" class="btn btn-outline btn-sm">
+          &larr; Back to Drivers Directory
+        </a>
+      </div>
+    </div>
+
+    <!-- ACTION DECISION BANNER -->
+    <div class="card" style="margin-bottom: 2rem; background: var(--bg-surface); border: 2px solid <%= driver.verificationStatus === 'verified' ? 'var(--teal-600)' : (driver.verificationStatus === 'rejected' ? 'var(--danger)' : 'var(--secondary-500)') %>;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.25rem;">
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">
+            Administrative Decision
+          </div>
+          <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 4px 0 6px 0;">
+            Verification Status: 
+            <%= driver.verificationStatus === 'verified' ? 'Approved & Verified' : (driver.verificationStatus === 'rejected' ? 'Rejected' : 'Awaiting Review') %>
+          </h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0; max-width: 600px;">
+            <% if (driver.verificationStatus === 'verified') { %>
+              This driver has been officially verified and is eligible for marketplace trip matching while their active status is on.
+            <% } else if (driver.verificationStatus === 'rejected') { %>
+              This driver was rejected by administration. They cannot participate in the trip marketplace. You can re-evaluate and approve them if appropriate.
+            <% } else { %>
+              Review the vehicle capacity, license details, and driving experience below before approving or rejecting this driver application.
+            <% } %>
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <!-- APPROVE BUTTON -->
+          <% if (driver.verificationStatus !== 'verified') { %>
+            <form action="/admin/drivers/<%= driver.id %>/verify" method="POST" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn btn-primary" style="background: var(--teal-600); border-color: var(--teal-700);">
+                ✓ Approve Driver
+              </button>
+            </form>
+          <% } %>
+
+          <!-- REJECT BUTTON (WITH MODAL TRIGGER) -->
+          <% if (driver.verificationStatus !== 'rejected') { %>
+            <button type="button" class="btn btn-outline" style="color: var(--danger); border-color: #fca5a5;" onclick="openRejectModal()">
+              ✕ Reject Application
+            </button>
+          <% } %>
+
+          <!-- ACTIVE / INACTIVE TOGGLE (WITH MODAL TRIGGER) -->
+          <button type="button" class="btn btn-secondary" onclick="openToggleActiveModal()">
+            <%= driver.isActive ? '⏸️ Pause Driver' : '▶️ Activate Driver' %>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2x2 INFORMATION GRIDS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+      <!-- PERSONAL & CONTACT INFORMATION -->
+      <div class="card">
+        <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0 0 1.25rem 0; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;">
+          <span>👤</span> Personal & Contact Details
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Legal Name</div>
+            <div style="font-size: 1rem; font-weight: 600; color: var(--primary-900);"><%= driver.name %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Email Address</div>
+            <div style="font-size: 0.95rem; color: var(--text-primary);"><%= driver.email %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Phone Number</div>
+            <div style="font-size: 0.95rem; color: var(--text-primary);">📞 <%= driver.phone %></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DRIVER CREDENTIALS -->
+      <div class="card">
+        <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0 0 1.25rem 0; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;">
+          <span>🪪</span> Driver Credentials
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Driver License Number</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: var(--primary-900); font-family: monospace;"><%= driver.licenseNumber %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Driving Experience</div>
+            <div style="font-size: 0.95rem; color: var(--text-primary);"><%= driver.experienceYears %> Years</div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current Verification</div>
+            <div style="font-size: 0.95rem; font-weight: 600;">
+              <%= driver.verificationStatus %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VEHICLE SPECIFICATIONS -->
+      <div class="card">
+        <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0 0 1.25rem 0; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;">
+          <span>🚐</span> Vehicle Specifications
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Van Make & Model</div>
+            <div style="font-size: 1rem; font-weight: 600; color: var(--primary-900);"><%= driver.vanModel %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">License Plate / Registration</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: var(--primary-900); font-family: monospace;"><%= driver.vanNumber %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Passenger Seating Capacity</div>
+            <div style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600;">👥 <%= driver.seatingCapacity %> Seats</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNT & AUDIT TRAIL -->
+      <div class="card">
+        <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0 0 1.25rem 0; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;">
+          <span>📋</span> Account & Audit Metadata
+        </h3>
+        <% 
+          const createdDate = driver.createdAt ? (typeof driver.createdAt.toDate === 'function' ? driver.createdAt.toDate().toLocaleString() : new Date(driver.createdAt).toLocaleString()) : 'N/A';
+          const updatedDate = driver.updatedAt ? (typeof driver.updatedAt.toDate === 'function' ? driver.updatedAt.toDate().toLocaleString() : new Date(driver.updatedAt).toLocaleString()) : 'N/A';
+          const verifDate = driver.verificationUpdatedAt ? (typeof driver.verificationUpdatedAt.toDate === 'function' ? driver.verificationUpdatedAt.toDate().toLocaleString() : new Date(driver.verificationUpdatedAt).toLocaleString()) : null;
+          const activeDate = driver.activeStatusUpdatedAt ? (typeof driver.activeStatusUpdatedAt.toDate === 'function' ? driver.activeStatusUpdatedAt.toDate().toLocaleString() : new Date(driver.activeStatusUpdatedAt).toLocaleString()) : null;
+        %>
+        <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
+          <div>
+            <span style="color: var(--text-muted);">Account Created:</span> <strong><%= createdDate %></strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Last Record Update:</span> <strong><%= updatedDate %></strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Availability Windows:</span> <strong><%= availabilityCount %> scheduled</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Accepted Trips:</span> <strong><%= acceptedTripsCount %> trips</strong>
+          </div>
+          <% if (verifDate) { %>
+            <div style="border-top: 1px dashed var(--border-subtle); padding-top: 6px;">
+              <span style="color: var(--text-muted);">Last Verification Action:</span> <strong><%= verifDate %></strong>
+              <% if (driver.verificationUpdatedBy) { %>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">By Admin: <%= driver.verificationUpdatedBy %></div>
+              <% } %>
+            </div>
+          <% } %>
+          <% if (activeDate) { %>
+            <div style="border-top: 1px dashed var(--border-subtle); padding-top: 6px;">
+              <span style="color: var(--text-muted);">Active Status Updated:</span> <strong><%= activeDate %></strong>
+              <% if (driver.activeStatusUpdatedBy) { %>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">By: <%= driver.activeStatusUpdatedBy %></div>
+              <% } %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- CONFIRMATION MODAL: REJECT DRIVER -->
+<div id="rejectModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div class="card" style="width: 100%; max-width: 480px; box-shadow: var(--shadow-xl); border: 1px solid #fca5a5;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.25rem; color: #991b1b; margin: 0; display: flex; align-items: center; gap: 8px;">
+        <span>⚠️</span> Reject Driver Application?
+      </h3>
+      <button type="button" onclick="closeRejectModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+    </div>
+
+    <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem;">
+      Are you sure you want to reject <strong><%= driver.name %></strong>? 
+      This will mark the application as rejected and prevent this driver from discovering and accepting tourist trip requests in the marketplace.
+    </p>
+
+    <form action="/admin/drivers/<%= driver.id %>/reject" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-outline" onclick="closeRejectModal()">Cancel</button>
+        <button type="submit" class="btn" style="background: var(--danger); color: white;">Confirm Rejection</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CONFIRMATION MODAL: TOGGLE ACTIVE / INACTIVE -->
+<div id="toggleActiveModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div class="card" style="width: 100%; max-width: 480px; box-shadow: var(--shadow-xl); border: 1px solid var(--border-subtle);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.25rem; color: var(--primary-900); margin: 0;">
+        <%= driver.isActive ? 'Pause Driver Account?' : 'Activate Driver Account?' %>
+      </h3>
+      <button type="button" onclick="closeToggleActiveModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+    </div>
+
+    <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem;">
+      <% if (driver.isActive) { %>
+        Pausing this driver will temporarily hide them from matching new tourist trip requests. Their existing verified credentials remain intact.
+      <% } else { %>
+        Activating this driver will allow them to participate in matching trip requests that fit their vehicle capacity and availability windows.
+      <% } %>
+    </p>
+
+    <form action="/admin/drivers/<%= driver.id %>/toggle-active" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-outline" onclick="closeToggleActiveModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">
+          <%= driver.isActive ? 'Confirm Pause' : 'Confirm Activation' %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openRejectModal() {
+    document.getElementById('rejectModal').style.display = 'flex';
+  }
+  function closeRejectModal() {
+    document.getElementById('rejectModal').style.display = 'none';
+  }
+
+  function openToggleActiveModal() {
+    document.getElementById('toggleActiveModal').style.display = 'flex';
+  }
+  function closeToggleActiveModal() {
+    document.getElementById('toggleActiveModal').style.display = 'none';
+  }
+
+  window.onclick = function(event) {
+    const rejectModal = document.getElementById('rejectModal');
+    const activeModal = document.getElementById('toggleActiveModal');
+    if (event.target === rejectModal) closeRejectModal();
+    if (event.target === activeModal) closeToggleActiveModal();
+  };
+</script>
+
+<%- include('partials/footer') %>
+

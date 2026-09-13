@@ -224,6 +224,16 @@ const requireDriver = (req, res, next) => {
   next();
 };
 
+const requireAdmin = (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return res.redirect("/login");
+  }
+  if (req.session.user.role !== "admin") {
+    return res.status(403).send("Access forbidden: Administrator account required.");
+  }
+  next();
+};
+
 // ==========================================
 // INPUT VALIDATION & SANITIZATION HELPERS
 // ==========================================
@@ -340,10 +350,15 @@ app.post("/login", authLimiter, async (req, res) => {
       if (userData.role === "driver") {
         return res.status(403).send("This account is registered as a Van Driver. Please log in via the Driver Portal at /driver/login.");
       }
+      const role = userData.role === "admin" ? "admin" : "tourist";
       req.session.regenerate((regErr) => {
         if (regErr) console.error("Session regeneration error:", regErr);
-        req.session.user = { uid, email: data.email, role: "tourist" };
-        res.redirect("/");
+        req.session.user = { uid, email: data.email, role };
+        if (role === "admin") {
+          res.redirect("/admin");
+        } else {
+          res.redirect("/");
+        }
       });
     } else {
       // Compatibility check: determine if this legacy account was a driver
@@ -855,15 +870,17 @@ const checkAvailabilityOverlap = async (dbInstance, driverUid, newFrom, newTo, e
   return { overlap: false };
 };
 
-// Driver matching logic for Phase 4 Marketplace:
+// Driver matching logic for Marketplace:
 // 1. Trip status == "Requested"
 // 2. Driver isActive == true
-// 3. Driver van seatingCapacity >= trip.people
-// 4. Driver has an availability period with period.status == "available" AND
+// 3. Driver verificationStatus == "verified"
+// 4. Driver van seatingCapacity >= trip.people
+// 5. Driver has an availability period with period.status == "available" AND
 //    trip.fromDate >= period.fromDate AND trip.toDate <= period.toDate
 const isTripMatchForDriver = (trip, driver, driverAvailability) => {
   if (trip.status !== "Requested") return false;
   if (!driver.isActive) return false;
+  if (driver.verificationStatus !== "verified") return false;
   if (Number(driver.seatingCapacity) < Number(trip.people)) return false;
 
   const covered = driverAvailability.some((period) => {
@@ -1372,6 +1389,17 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
         throw err;
       }
 
+      // 4b. Verify driver verificationStatus == "verified"
+      if (driver.verificationStatus !== "verified") {
+        const err = new Error(
+          driver.verificationStatus === "rejected"
+            ? "Your driver account has been rejected by administration."
+            : "Your driver account is pending verification. Only verified drivers can accept trips."
+        );
+        err.code = driver.verificationStatus === "rejected" ? "DRIVER_REJECTED" : "DRIVER_NOT_VERIFIED";
+        throw err;
+      }
+
       // 5. Verify driver seating capacity >= trip.people
       const vanCapacity = Number(driver.seatingCapacity);
       const tripPeople = Number(trip.people);
@@ -1455,6 +1483,10 @@ app.post("/driver/trips/:id/accept", requireDriver, actionLimiter, async (req, r
       userMessage = "You already have an accepted trip during these dates.";
     } else if (err.code === "DRIVER_INACTIVE") {
       userMessage = "Your driver account is currently inactive. Activate your profile before accepting trips.";
+    } else if (err.code === "DRIVER_REJECTED") {
+      userMessage = "Your driver account has been rejected by administration.";
+    } else if (err.code === "DRIVER_NOT_VERIFIED") {
+      userMessage = "Your driver account is pending verification. Only verified drivers can accept trips.";
     } else if (err.code === "INSUFFICIENT_CAPACITY") {
       userMessage = "Your van does not have enough seats for this trip.";
     } else if (err.code === "AVAILABILITY_CHANGED") {
@@ -1517,6 +1549,345 @@ app.get("/driver/my-trips", requireDriver, async (req, res) => {
   } catch (err) {
     console.error("❌ Driver my-trips error:", err.message);
     res.status(500).send("Unable to load your accepted trips.");
+  }
+});
+
+// ==========================================
+// ADMIN PORTAL ROUTES
+// ==========================================
+
+app.get("/admin", requireAdmin, async (req, res) => {
+  try {
+    const [usersSnap, driversSnap, tripsSnap] = await Promise.all([
+      db.collection("users").get(),
+      db.collection("drivers").get(),
+      db.collection("bookings").get(),
+    ]);
+
+    const totalUsers = usersSnap.size;
+    const totalDrivers = driversSnap.size;
+    const totalTrips = tripsSnap.size;
+
+    let pendingDriversCount = 0;
+    let activeDriversCount = 0;
+    const allDrivers = [];
+
+    driversSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.verificationStatus === "pending") pendingDriversCount++;
+      if (data.isActive) activeDriversCount++;
+      allDrivers.push({ id: doc.id, ...data });
+    });
+
+    let requestedTripsCount = 0;
+    let acceptedTripsCount = 0;
+    let cancelledTripsCount = 0;
+    const allTrips = [];
+
+    tripsSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === "Requested") requestedTripsCount++;
+      else if (data.status === "Accepted") acceptedTripsCount++;
+      else if (data.status === "Cancelled") cancelledTripsCount++;
+      allTrips.push({ id: doc.id, ...data });
+    });
+
+    // Pending drivers for quick review (up to 5)
+    const pendingDrivers = allDrivers
+      .filter((d) => d.verificationStatus === "pending")
+      .sort((a, b) => {
+        const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return tB - tA;
+      })
+      .slice(0, 5);
+
+    // Recent trips (up to 5)
+    const recentTrips = allTrips
+      .sort((a, b) => {
+        const tA = a.bookedAt?.toDate ? a.bookedAt.toDate().getTime() : new Date(a.bookedAt || 0).getTime();
+        const tB = b.bookedAt?.toDate ? b.bookedAt.toDate().getTime() : new Date(b.bookedAt || 0).getTime();
+        return tB - tA;
+      })
+      .slice(0, 5);
+
+    // Recent drivers (up to 5)
+    const recentDrivers = allDrivers
+      .sort((a, b) => {
+        const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return tB - tA;
+      })
+      .slice(0, 5);
+
+    res.render("admin-dashboard", {
+      stats: {
+        totalUsers,
+        totalDrivers,
+        pendingDriversCount,
+        activeDriversCount,
+        totalTrips,
+        requestedTripsCount,
+        acceptedTripsCount,
+        cancelledTripsCount,
+      },
+      pendingDrivers,
+      recentTrips,
+      recentDrivers,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Admin dashboard error:", err.message);
+    res.status(500).send("Unable to load admin dashboard.");
+  }
+});
+
+app.get("/admin/drivers", requireAdmin, async (req, res) => {
+  try {
+    const driversSnap = await db.collection("drivers").get();
+    let drivers = [];
+
+    driversSnap.forEach((doc) => {
+      drivers.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Filter by status tab
+    const statusFilter = (req.query.status || "all").trim().toLowerCase();
+    if (statusFilter === "pending") {
+      drivers = drivers.filter((d) => d.verificationStatus === "pending");
+    } else if (statusFilter === "verified") {
+      drivers = drivers.filter((d) => d.verificationStatus === "verified");
+    } else if (statusFilter === "rejected") {
+      drivers = drivers.filter((d) => d.verificationStatus === "rejected");
+    } else if (statusFilter === "active") {
+      drivers = drivers.filter((d) => d.isActive === true);
+    } else if (statusFilter === "inactive") {
+      drivers = drivers.filter((d) => d.isActive === false);
+    }
+
+    // Search filter
+    const q = (req.query.q || "").trim().toLowerCase();
+    if (q) {
+      drivers = drivers.filter((d) => {
+        const nameMatch = (d.name || "").toLowerCase().includes(q);
+        const emailMatch = (d.email || "").toLowerCase().includes(q);
+        const vanMatch = (d.vanNumber || "").toLowerCase().includes(q);
+        const modelMatch = (d.vanModel || "").toLowerCase().includes(q);
+        return nameMatch || emailMatch || vanMatch || modelMatch;
+      });
+    }
+
+    // Sort by createdAt desc
+    drivers.sort((a, b) => {
+      const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+      const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    res.render("admin-drivers", {
+      drivers,
+      currentFilter: statusFilter,
+      searchQuery: q,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Admin drivers list error:", err.message);
+    res.status(500).send("Unable to load drivers directory.");
+  }
+});
+
+app.get("/admin/drivers/:id", requireAdmin, async (req, res) => {
+  const driverId = sanitizeString(req.params.id, 128);
+  if (!driverId) {
+    return res.status(404).send("Driver profile not found.");
+  }
+
+  try {
+    const driverDoc = await db.collection("drivers").doc(driverId).get();
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+
+    const driver = { id: driverDoc.id, ...driverDoc.data() };
+
+    const [availSnap, tripsSnap] = await Promise.all([
+      db.collection("drivers").doc(driverId).collection("availability").get(),
+      db.collection("bookings").where("driverId", "==", driverId).get(),
+    ]);
+
+    const availabilityCount = availSnap.size;
+    const acceptedTripsCount = tripsSnap.size;
+
+    res.render("admin-driver-detail", {
+      driver,
+      availabilityCount,
+      acceptedTripsCount,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Admin driver detail error:", err.message);
+    res.status(500).send("Unable to load driver details.");
+  }
+});
+
+app.post("/admin/drivers/:id/verify", requireAdmin, actionLimiter, async (req, res) => {
+  const driverId = sanitizeString(req.params.id, 128);
+  const adminUid = req.session.user.uid;
+
+  try {
+    const driverRef = db.collection("drivers").doc(driverId);
+    const driverDoc = await driverRef.get();
+
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+    await driverRef.update({
+      verificationStatus: "verified",
+      verificationUpdatedAt: serverNow,
+      verificationUpdatedBy: adminUid,
+      updatedAt: serverNow,
+    });
+
+    console.log(`✅ Admin ${adminUid} verified driver ${driverId}`);
+    res.redirect(`/admin/drivers/${driverId}?msg=` + encodeURIComponent("Driver has been approved and verified successfully."));
+  } catch (err) {
+    console.error("❌ Admin verify driver error:", err.message);
+    res.redirect(`/admin/drivers/${driverId}?err=` + encodeURIComponent("Failed to verify driver."));
+  }
+});
+
+app.post("/admin/drivers/:id/reject", requireAdmin, actionLimiter, async (req, res) => {
+  const driverId = sanitizeString(req.params.id, 128);
+  const adminUid = req.session.user.uid;
+
+  try {
+    const driverRef = db.collection("drivers").doc(driverId);
+    const driverDoc = await driverRef.get();
+
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+    await driverRef.update({
+      verificationStatus: "rejected",
+      verificationUpdatedAt: serverNow,
+      verificationUpdatedBy: adminUid,
+      updatedAt: serverNow,
+    });
+
+    console.log(`⚠️ Admin ${adminUid} rejected driver ${driverId}`);
+    res.redirect(`/admin/drivers/${driverId}?msg=` + encodeURIComponent("Driver verification has been rejected."));
+  } catch (err) {
+    console.error("❌ Admin reject driver error:", err.message);
+    res.redirect(`/admin/drivers/${driverId}?err=` + encodeURIComponent("Failed to reject driver."));
+  }
+});
+
+app.post("/admin/drivers/:id/toggle-active", requireAdmin, actionLimiter, async (req, res) => {
+  const driverId = sanitizeString(req.params.id, 128);
+  const adminUid = req.session.user.uid;
+
+  try {
+    const driverRef = db.collection("drivers").doc(driverId);
+    const driverDoc = await driverRef.get();
+
+    if (!driverDoc.exists) {
+      return res.status(404).send("Driver profile not found.");
+    }
+
+    const currentActive = !!driverDoc.data().isActive;
+    const newActive = !currentActive;
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+
+    await driverRef.update({
+      isActive: newActive,
+      activeStatusUpdatedAt: serverNow,
+      activeStatusUpdatedBy: adminUid,
+      updatedAt: serverNow,
+    });
+
+    console.log(`✅ Admin ${adminUid} changed active status of driver ${driverId} to ${newActive}`);
+    res.redirect(`/admin/drivers/${driverId}?msg=` + encodeURIComponent(`Driver status changed to ${newActive ? "Active" : "Paused"}.`));
+  } catch (err) {
+    console.error("❌ Admin toggle driver active error:", err.message);
+    res.redirect(`/admin/drivers/${driverId}?err=` + encodeURIComponent("Failed to update driver active status."));
+  }
+});
+
+app.get("/admin/trips", requireAdmin, async (req, res) => {
+  try {
+    const tripsSnap = await db.collection("bookings").get();
+    let trips = [];
+
+    tripsSnap.forEach((doc) => {
+      trips.push({ id: doc.id, ...doc.data() });
+    });
+
+    const statusFilter = (req.query.status || "all").trim();
+    if (statusFilter && statusFilter !== "all") {
+      trips = trips.filter((t) => (t.status || "").toLowerCase() === statusFilter.toLowerCase());
+    }
+
+    // Sort by bookedAt desc
+    trips.sort((a, b) => {
+      const tA = a.bookedAt?.toDate ? a.bookedAt.toDate().getTime() : new Date(a.bookedAt || 0).getTime();
+      const tB = b.bookedAt?.toDate ? b.bookedAt.toDate().getTime() : new Date(b.bookedAt || 0).getTime();
+      return tB - tA;
+    });
+
+    res.render("admin-trips", {
+      trips,
+      currentFilter: statusFilter,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Admin trips monitor error:", err.message);
+    res.status(500).send("Unable to load platform trips.");
+  }
+});
+
+app.get("/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const usersSnap = await db.collection("users").get();
+    let usersList = [];
+
+    usersSnap.forEach((doc) => {
+      usersList.push({ id: doc.id, ...doc.data() });
+    });
+
+    const roleFilter = (req.query.role || "all").trim().toLowerCase();
+    if (roleFilter && roleFilter !== "all") {
+      usersList = usersList.filter((u) => (u.role || "").toLowerCase() === roleFilter);
+    }
+
+    // Sort by createdAt desc
+    usersList.sort((a, b) => {
+      const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+      const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    res.render("admin-users", {
+      usersList,
+      currentFilter: roleFilter,
+      successMessage: req.query.msg || null,
+      errorMessage: req.query.err || null,
+      user: req.session.user,
+    });
+  } catch (err) {
+    console.error("❌ Admin users directory error:", err.message);
+    res.status(500).send("Unable to load user accounts.");
   }
 });
 

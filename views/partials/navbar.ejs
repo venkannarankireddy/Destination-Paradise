@@ -1,7 +1,14 @@
 <header class="site-header">
   <div class="container">
     <nav class="navbar">
-      <% if (typeof user !== 'undefined' && user && user.role === 'driver') { %>
+      <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>
+        <!-- ADMIN BRAND -->
+        <a href="/admin" class="brand">
+          <span class="brand-icon">🛡️</span>
+          Destination Paradise
+          <span class="brand-badge" style="background: var(--danger);">ADMIN</span>
+        </a>
+      <% } else if (typeof user !== 'undefined' && user && user.role === 'driver') { %>
         <!-- DRIVER BRAND -->
         <a href="/driver/dashboard" class="brand">
           <span class="brand-icon">🚐</span>
@@ -30,6 +37,13 @@
             <li><a href="/#how-it-works" class="nav-link">How It Works</a></li>
             <li><a href="/#packages" class="nav-link">Packages</a></li>
             <li><a href="/#booking" class="nav-link">Book a Trip</a></li>
+          <% } else if (user.role === 'admin') { %>
+            <!-- ADMIN LINKS -->
+            <li><a href="/admin" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'admin-dashboard' ? 'active' : '' %>">Dashboard</a></li>
+            <li><a href="/admin/drivers" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'admin-drivers' ? 'active' : '' %>">Drivers</a></li>
+            <li><a href="/admin/drivers?status=pending" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'admin-pending' ? 'active' : '' %>">Pending Review</a></li>
+            <li><a href="/admin/trips" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'admin-trips' ? 'active' : '' %>">Trips</a></li>
+            <li><a href="/admin/users" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'admin-users' ? 'active' : '' %>">Users</a></li>
           <% } else if (user.role === 'driver') { %>
             <!-- VAN DRIVER LINKS -->
             <li><a href="/driver/dashboard" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">Dashboard</a></li>
@@ -53,7 +67,13 @@
             <a href="/driver/login" class="btn btn-secondary btn-sm">Drive With Us</a>
           <% } else { %>
             <span class="user-tag" title="<%= user.email %>">
-              <%= user.role === 'driver' ? '🚐 ' : '👤 ' %><%= user.name || user.email %>
+              <% if (user.role === 'admin') { %>
+                🛡️ Admin
+              <% } else if (user.role === 'driver') { %>
+                🚐 <%= user.name || user.email %>
+              <% } else { %>
+                👤 <%= user.name || user.email %>
+              <% } %>
             </span>
             <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
           <% } %>
@@ -62,4 +82,3 @@
     </nav>
   </div>
 </header>
-

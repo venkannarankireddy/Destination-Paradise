@@ -1,0 +1,148 @@
+<%- include('partials/head', { title: 'Driver Management' }) %>
+<%- include('partials/navbar', { activePage: 'admin-drivers' }) %>
+
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container">
+    <%- include('partials/flash') %>
+
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
+          Driver Directory & Verification
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Review applicant credentials, manage verification status, and toggle marketplace discovery eligibility.
+        </p>
+      </div>
+
+      <a href="/admin" class="btn btn-outline btn-sm">
+        &larr; Back to Admin Overview
+      </a>
+    </div>
+
+    <!-- FILTER & SEARCH BAR -->
+    <div class="card" style="margin-bottom: 2rem; padding: 1.25rem;">
+      <form action="/admin/drivers" method="GET" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+        <!-- TABS / STATUS FILTER -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <a href="/admin/drivers?status=all" class="btn <%= currentFilter === 'all' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            All (<%= drivers.length %>)
+          </a>
+          <a href="/admin/drivers?status=pending" class="btn <%= currentFilter === 'pending' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            ⏳ Pending
+          </a>
+          <a href="/admin/drivers?status=verified" class="btn <%= currentFilter === 'verified' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            ✓ Verified
+          </a>
+          <a href="/admin/drivers?status=rejected" class="btn <%= currentFilter === 'rejected' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            ✕ Rejected
+          </a>
+          <a href="/admin/drivers?status=active" class="btn <%= currentFilter === 'active' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            🟢 Active
+          </a>
+          <a href="/admin/drivers?status=inactive" class="btn <%= currentFilter === 'inactive' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+            ⏸️ Paused
+          </a>
+        </div>
+
+        <!-- SEARCH INPUT -->
+        <div style="display: flex; gap: 8px; flex: 1; max-width: 380px;">
+          <input 
+            type="text" 
+            name="q" 
+            class="form-input" 
+            placeholder="Search name, email, van #..." 
+            value="<%= searchQuery || '' %>"
+            style="padding: 8px 12px; font-size: 0.88rem;"
+          />
+          <% if (currentFilter !== 'all') { %>
+            <input type="hidden" name="status" value="<%= currentFilter %>">
+          <% } %>
+          <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0 14px;">Search</button>
+          <% if (searchQuery) { %>
+            <a href="/admin/drivers?status=<%= currentFilter %>" class="btn btn-outline btn-sm" style="padding: 0 10px; display: inline-flex; align-items: center;">Clear</a>
+          <% } %>
+        </div>
+      </form>
+    </div>
+
+    <!-- DRIVERS TABLE -->
+    <div class="card">
+      <% if (drivers.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-state-icon">🚐</div>
+          <h3 class="empty-state-title">No Drivers Found</h3>
+          <p class="empty-state-desc">
+            No driver records match the selected filter criteria (<%= currentFilter %>).
+          </p>
+          <a href="/admin/drivers" class="btn btn-outline">Reset Filter</a>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Driver Details</th>
+                <th>Vehicle & Seating</th>
+                <th>License & Experience</th>
+                <th>Verification Status</th>
+                <th>Marketplace Status</th>
+                <th>Registered</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% drivers.forEach((d) => { %>
+                <% const regDate = d.createdAt ? (typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toLocaleDateString() : new Date(d.createdAt).toLocaleDateString()) : 'N/A'; %>
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: var(--primary-900);"><%= d.name %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);"><%= d.email %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-secondary);">📞 <%= d.phone %></div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: var(--primary-900);"><%= d.vanModel %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);"><%= d.vanNumber %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-secondary);">👥 <%= d.seatingCapacity %> passenger seats</div>
+                  </td>
+                  <td>
+                    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-900);"><%= d.licenseNumber %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);"><%= d.experienceYears %> years exp.</div>
+                  </td>
+                  <td>
+                    <% if (d.verificationStatus === 'verified') { %>
+                      <span class="badge badge-active">✓ Verified</span>
+                    <% } else if (d.verificationStatus === 'rejected') { %>
+                      <span class="badge badge-inactive">✕ Rejected</span>
+                    <% } else { %>
+                      <span class="badge badge-pending">⏳ Pending Review</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (d.isActive) { %>
+                      <span class="badge badge-active" style="font-size: 0.78rem;">🟢 Active</span>
+                    <% } else { %>
+                      <span class="badge badge-inactive" style="font-size: 0.78rem;">⏸️ Paused</span>
+                    <% } %>
+                  </td>
+                  <td style="font-size: 0.85rem; color: var(--text-muted);">
+                    <%= regDate %>
+                  </td>
+                  <td style="text-align: right;">
+                    <a href="/admin/drivers/<%= d.id %>" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
+                      Review & Manage &rarr;
+                    </a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+

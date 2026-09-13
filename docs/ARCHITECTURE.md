@@ -2,7 +2,9 @@
 
 ## 1. System Overview
 
-Destination Paradise is a two-sided travel marketplace connecting **Tourists** seeking customized travel with verified **Van Drivers** offering vehicle capacity and regional route availability. The platform operates on a direct contact & matching model: tourists submit trip requests, available van drivers with matching seating capacity and scheduled calendar availability discover these requests, negotiate trip terms and pricing directly via telephone or WhatsApp, and lock in trips on the platform via atomic transactions.
+Destination Paradise is a two-sided travel marketplace connecting **Tourists** seeking customized travel with verified **Van Drivers** offering vehicle capacity and regional route availability. The platform operates on a direct contact & matching model: tourists submit trip requests, verified van drivers with matching seating capacity and scheduled calendar availability discover these requests in real time, negotiate trip terms and pricing directly via telephone or WhatsApp, and lock in trips on the platform via atomic transactions.
+
+An administrative governance layer (**Admin Portal**) provides supervisory controls, review and verification of driver applicants, active status management, and platform-wide monitoring.
 
 ---
 
@@ -10,7 +12,7 @@ Destination Paradise is a two-sided travel marketplace connecting **Tourists** s
 
 - **Runtime & Engine:** Node.js (>= 18.x, v24 tested)
 - **Web Framework:** Express.js (v5.1.x)
-- **Templating Engine:** EJS with server-side rendered layouts
+- **Templating Engine:** EJS with server-side rendered layouts and shared partials
 - **Authentication:** Firebase Authentication (via Google Identity Toolkit REST API v1)
 - **Database & Transactions:** Google Cloud Firestore (Firebase Admin SDK v13.x)
 - **Session Management:** `express-session` with `cookie-parser`
@@ -21,12 +23,12 @@ Destination Paradise is a two-sided travel marketplace connecting **Tourists** s
 
 ---
 
-## 3. Route Access Matrix
+## 3. Route Access & Permission Matrix
 
 | Route | Method | Access Level | Description |
 |---|---|---|---|
 | `/` | `GET` | Public | Homepage, destination catalog, and booking submission form |
-| `/login` | `GET`, `POST` | Public (Anonymous) | Tourist login (redirects authenticated users) |
+| `/login` | `GET`, `POST` | Public (Anonymous) | Tourist/Admin login (redirects authenticated users) |
 | `/register` | `GET`, `POST` | Public (Anonymous) | Tourist account creation |
 | `/logout` | `GET` | Authenticated | Destroys active session and clears session cookie |
 | `/csrf-token` | `GET` | Public | Returns a fresh CSRF token for AJAX clients |
@@ -42,9 +44,17 @@ Destination Paradise is a two-sided travel marketplace connecting **Tourists** s
 | `/driver/availability/:id/update` | `POST` | **Driver Only** | Updates an existing availability window with overlap verification |
 | `/driver/availability/:id/delete` | `POST` | **Driver Only** | Deletes an availability window |
 | `/driver/availability/:id/toggle` | `POST` | **Driver Only** | Toggles window status between `available` and `unavailable` |
-| `/driver/trips` | `GET` | **Driver Only** | Marketplace of open trip requests matching driver capacity and dates |
-| `/driver/trips/:id/accept` | `POST` | **Driver Only** | Atomically accepts a trip request with concurrency and overlap validation |
+| `/driver/trips` | `GET` | **Driver Only** | Marketplace of open trip requests matching driver capacity, dates, and verification |
+| `/driver/trips/:id/accept` | `POST` | **Driver Only** | Atomically accepts a trip request with concurrency, overlap, and verification validation |
 | `/driver/my-trips` | `GET` | **Driver Only** | Driver's schedule of accepted trips (Upcoming & Past) with tourist contact info |
+| `/admin` | `GET` | **Admin Only** | Admin Dashboard: Operational metrics, pending review queue, recent activity |
+| `/admin/drivers` | `GET` | **Admin Only** | Driver Directory: Paginated/filtered driver list (`pending`, `verified`, `rejected`, `active`, `inactive`) and search |
+| `/admin/drivers/:id` | `GET` | **Admin Only** | Driver Review Page: Personal, credentials, vehicle specs, and audit trail |
+| `/admin/drivers/:id/verify` | `POST` | **Admin Only** | Approves driver application (`verificationStatus: "verified"`). CSRF protected |
+| `/admin/drivers/:id/reject` | `POST` | **Admin Only** | Rejects driver application (`verificationStatus: "rejected"`). CSRF protected |
+| `/admin/drivers/:id/toggle-active` | `POST` | **Admin Only** | Toggles driver `isActive` status (preserves `verificationStatus`). CSRF protected |
+| `/admin/trips` | `GET` | **Admin Only** | Platform Trips Monitor: Read-only tracking of all platform bookings |
+| `/admin/users` | `GET` | **Admin Only** | Platform Users Registry: Read-only directory of all user accounts |
 
 ---
 
@@ -56,7 +66,8 @@ Documents keyed by Firebase Authentication `uid`: `users/{uid}`
 {
   "uid": "string (Firebase UID)",
   "email": "string (normalized lowercase)",
-  "role": "tourist" | "driver",
+  "role": "tourist" | "driver" | "admin",
+  "promotedAt": "Timestamp | null",
   "createdAt": "Timestamp",
   "updatedAt": "Timestamp"
 }
@@ -76,7 +87,11 @@ Documents keyed by Firebase Authentication `uid`: `drivers/{uid}`
   "seatingCapacity": "number (4-20)",
   "experienceYears": "number (0-60)",
   "verificationStatus": "pending" | "verified" | "rejected",
+  "verificationUpdatedAt": "Timestamp | null",
+  "verificationUpdatedBy": "string (Admin UID) | null",
   "isActive": "boolean",
+  "activeStatusUpdatedAt": "Timestamp | null",
+  "activeStatusUpdatedBy": "string (UID) | null",
   "createdAt": "Timestamp",
   "updatedAt": "Timestamp"
 }
@@ -127,12 +142,45 @@ Documents keyed by auto-generated document ID: `bookings/{bookingId}`
 
 ---
 
-## 5. State Machine & Booking Lifecycle
+## 5. Driver Verification Lifecycle & Marketplace Matching
+
+### Canonical Verification States:
+1. `pending`: Initial status upon driver registration. The driver cannot match trips or accept bookings.
+2. `verified`: Approved by an administrator. The driver can discover matching requests and accept bookings (provided `isActive === true`).
+3. `rejected`: Rejected by an administrator. The driver is strictly barred from matching requests and accepting bookings.
+
+### Production Marketplace Eligibility Matrix:
+| Verification Status | Active Status | Marketplace Matching | Trip Acceptance |
+|---|---|---|---|
+| `verified` | `true` | **Eligible** | **Allowed** |
+| `verified` | `false` | Not Eligible | Blocked (`DRIVER_INACTIVE`) |
+| `pending` | `true` | Not Eligible | Blocked (`DRIVER_NOT_VERIFIED`) |
+| `pending` | `false` | Not Eligible | Blocked (`DRIVER_INACTIVE`) |
+| `rejected` | `true` | Not Eligible | Blocked (`DRIVER_REJECTED`) |
+| `rejected` | `false` | Not Eligible | Blocked (`DRIVER_REJECTED`) |
+
+---
+
+## 6. Administrator Provisioning Security Model
+
+- **No Public Registration:** There is no `/admin/register` endpoint. Normal user registration exclusively issues `role: "tourist"` (at `/register`) or `role: "driver"` (at `/driver/register`).
+- **No Dynamic Promotion:** The server does not dynamically upgrade roles during normal login based on client-controlled parameters or simple email matching.
+- **Server-Side CLI Utility:** System operators provision administrators via the CLI tool:
+  ```bash
+  node scripts/make-admin.js <email>
+  ```
+  The script initializes the Firebase Admin SDK, verifies the existence of the user record in `users/{uid}`, updates `role: "admin"`, and records `promotedAt`.
+- **Role Verification on Login:** `POST /login` reads `userData.role` from Firestore. If `role === "admin"`, the session is populated with `role: "admin"` and redirected to `/admin`.
+- **Server-Side Route Enforcement:** `requireAdmin` validates `req.session?.user?.role === "admin"`. Unauthenticated requests redirect to `/login`; unauthorized authenticated users (tourists, drivers) receive HTTP 403 Forbidden.
+
+---
+
+## 7. State Machine & Booking Lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> Requested: Tourist submits trip request
-    Requested --> Accepted: Matching driver verifies details & accepts trip
+    Requested --> Accepted: Verified & Active driver accepts trip
     Requested --> Cancelled: Tourist cancels before assignment
     Accepted --> Cancelled: Tourist cancels accepted trip
     Requested --> Confirmed: Legacy bookings (supported for backward compatibility)
@@ -142,86 +190,17 @@ stateDiagram-v2
 
 ### Lifecycle Rules:
 1. **New Bookings**: Created with initial status `Requested`, `driverId: null`, and assigned driver vehicle fields set to `null`.
-2. **Acceptance**: Drivers can only accept trips in `Requested` status. Once accepted, status transitions to `Accepted` atomically via Firestore transaction.
+2. **Acceptance**: Drivers must be verified, active, have sufficient seating capacity, and have an active availability window covering the complete trip with no overlapping accepted trips. Concurrency is enforced via Firestore transaction.
 3. **Cancellation**: A tourist can cancel any of their own bookings whose status is not already `Cancelled`.
 4. **Backward Compatibility**: Legacy `Confirmed` bookings remain viewable on dashboards and cannot be mutated by driver workflows.
 
 ---
 
-## 6. Driver Availability & Overlap Prevention Logic
+## 8. Audit Trails & Write Safety
 
-### Calendar Date Format
-All dates are strictly normalized to `YYYY-MM-DD` strings. Standard lexicographical string comparison is valid: `dateA <= dateB`.
-
-### Overlap Condition
-Two date ranges `[FromA, ToA]` and `[FromB, ToB]` overlap if and only if:
-```
-FromA <= ToB AND ToA >= FromB
-```
-
-### Marketplace Discovery Rules
-For an open trip request (`status == 'Requested'`) to be visible to a driver:
-1. Driver must be active: `driver.isActive === true`
-2. Vehicle capacity must accommodate trip passengers: `driver.seatingCapacity >= trip.people`
-3. Driver must have a scheduled window with `status === 'available'` covering the entire trip:
-   `trip.fromDate >= period.fromDate AND trip.toDate <= period.toDate`
-
-### Concurrency & Transactional Acceptance
-When a driver submits `POST /driver/trips/:id/accept`, an atomic `db.runTransaction` executes:
-1. Verifies trip document exists and has `status === 'Requested'`.
-2. Verifies driver exists and has `isActive === true`.
-3. Verifies driver van capacity `seatingCapacity >= trip.people`.
-4. Re-verifies driver's availability window still covers the trip dates.
-5. Verifies driver has no overlapping accepted trip:
-   Queries `bookings` where `driverId == driverUid` and `status == 'Accepted'`.
-   Asserts `trip.fromDate <= existing.toDate && trip.toDate >= existing.fromDate` is false for all records.
-6. Updates trip status to `Accepted` with driver and vehicle snapshot.
-
----
-
-## 7. Security Architecture & Hardening
-
-### 1. CSRF Protection
-- Implemented via `csrf-csrf` (v4.x) using the Double-Submit Cookie pattern with cryptographic HMAC signing.
-- Non-mutating methods (`GET`, `HEAD`, `OPTIONS`) are exempt.
-- Token extractor supports both standard HTML form body (`req.body._csrf`) and AJAX header (`X-CSRF-Token`).
-- Cookies are configured with `httpOnly: true`, `sameSite: "lax"`, and secured in production.
-
-### 2. Rate Limiting
-- **Auth Limiter**: 50 requests per 15-minute window for authentication endpoints (`/login`, `/register`, `/driver/login`, `/driver/register`).
-- **Action Limiter**: 120 requests per 15-minute window for state-changing endpoints (`/bookings`, `/cancel-booking`, driver profile, availability, and trip acceptance).
-
-### 3. Session Hardening
-- Session identifier renamed to `dp.sid` to obscure framework fingerprinting.
-- `req.session.regenerate()` is executed upon successful login and registration to mitigate Session Fixation attacks.
-- Session cookie configured with `httpOnly: true`, `sameSite: 'lax'`, `maxAge: 86400000` (24 hours).
-
-### 4. HTTP Headers (Helmet)
-- Custom Content-Security-Policy (CSP):
-  - Scripts: `'self'`, Google APIs (`identitytoolkit.googleapis.com`)
-  - Styles: `'self'`, `'unsafe-inline'`, Google Fonts
-  - Connect: `'self'`, `identitytoolkit.googleapis.com`
-  - Deep-links: `tel:`, `https://wa.me/`
-- Standard headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Strict-Transport-Security`.
-
-### 5. Input Sanitization & Validation
-- Tourist bookings: String length limits (Destination <= 100, Name <= 100), phone regex (7-15 digits), ISO date format (`YYYY-MM-DD`), date ordering (`toDate > fromDate >= tomorrow`), passenger range (1-20).
-- Driver profiles: Driver license <= 50, Van model <= 100, Plate <= 30, Seating capacity (4-20), Driving experience (0-60).
-
-### 6. Duplicate Submission & Spam Protection
-- **Client-Side**: Immediate button disablement with `"Submitting..."` indicator on form submission.
-- **Server-Side**: 60-second duplicate trip window query prevents rapid identical bookings for the same user, destination, and dates.
-
-### 7. Firestore Write Whitelisting
-- Strict server-constructed write payloads. User-submitted request bodies are never passed directly to `collection.add()` or `doc.set()`.
-- Tourist UID and email are strictly extracted from authenticated session tokens.
-
----
-
-## 8. Production Deployment Guidelines
-
-1. **Session Store**: In production environments with multiple instances or horizontal scaling, replace the default in-memory session store (`MemoryStore`) with a distributed session store such as `connect-redis` or `firestore-store`.
-2. **HTTPS / Secure Cookies**: Ensure `cookie.secure = true` is active when deploying behind TLS/SSL reverse proxies (e.g. Nginx, Cloudflare, Google Cloud Run) and set `app.set("trust proxy", 1)`.
-3. **Secrets Management**: Store `SESSION_SECRET`, `FIREBASE_API_KEY`, and service account credentials in secret managers (e.g. Google Cloud Secret Manager or AWS Secrets Manager) rather than committing files.
-4. **Firestore Indexes**: Deploy `firestore.indexes.json` using the Firebase CLI (`firebase deploy --only firestore:indexes`) to avoid query throttling.
-
+Whenever an administrator alters driver verification or active status:
+- `verificationUpdatedAt`: Recorded via `admin.firestore.FieldValue.serverTimestamp()`.
+- `verificationUpdatedBy`: Populated strictly from the authenticated admin's session UID (`req.session.user.uid`).
+- `activeStatusUpdatedAt`: Server timestamp of active status change.
+- `activeStatusUpdatedBy`: Authenticated UID of the actor who updated active status.
+- **Strict Whitelist Updates:** Updates are applied using explicit field object mappings (`driverRef.update({...})`). Spreading raw request bodies into Firestore is strictly prohibited.

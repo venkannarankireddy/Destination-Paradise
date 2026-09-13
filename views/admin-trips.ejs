@@ -1,0 +1,119 @@
+<%- include('partials/head', { title: 'Platform Trips Monitor' }) %>
+<%- include('partials/navbar', { activePage: 'admin-trips' }) %>
+
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container">
+    <%- include('partials/flash') %>
+
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
+          Platform Trips Monitor
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Read-only operational tracking of tourist trip requests, driver assignments, and booking lifecycles.
+        </p>
+      </div>
+
+      <a href="/admin" class="btn btn-outline btn-sm">
+        &larr; Back to Admin Overview
+      </a>
+    </div>
+
+    <!-- FILTER TABS -->
+    <div class="card" style="margin-bottom: 2rem; padding: 1.25rem;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="/admin/trips?status=all" class="btn <%= !currentFilter || currentFilter === 'all' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          All Trips
+        </a>
+        <a href="/admin/trips?status=Requested" class="btn <%= currentFilter === 'Requested' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          🟡 Looking for Driver
+        </a>
+        <a href="/admin/trips?status=Accepted" class="btn <%= currentFilter === 'Accepted' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          🟢 Driver Assigned
+        </a>
+        <a href="/admin/trips?status=Confirmed" class="btn <%= currentFilter === 'Confirmed' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          ✓ Confirmed (Legacy)
+        </a>
+        <a href="/admin/trips?status=Cancelled" class="btn <%= currentFilter === 'Cancelled' ? 'btn-primary' : 'btn-outline' %> btn-sm">
+          ✕ Cancelled
+        </a>
+      </div>
+    </div>
+
+    <!-- TRIPS TABLE -->
+    <div class="card">
+      <% if (trips.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-state-icon">🧭</div>
+          <h3 class="empty-state-title">No Trips Found</h3>
+          <p class="empty-state-desc">
+            No trip requests match the selected status filter.
+          </p>
+          <a href="/admin/trips" class="btn btn-outline">Reset Filter</a>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Destination & Dates</th>
+                <th>Tourist Contact</th>
+                <th>Party</th>
+                <th>Trip Status</th>
+                <th>Assigned Driver</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% trips.forEach((t) => { %>
+                <% const bookedDate = t.bookedAt ? (typeof t.bookedAt.toDate === 'function' ? t.bookedAt.toDate().toLocaleDateString() : new Date(t.bookedAt).toLocaleDateString()) : 'N/A'; %>
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: var(--primary-900); font-size: 1rem;">🌴 <%= t.destination %></div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">📅 <%= t.fromDate %> &rarr; <%= t.toDate %></div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: var(--primary-900);"><%= t.name %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);"><%= t.email %></div>
+                    <div style="font-size: 0.82rem; color: var(--text-secondary);">📞 <%= t.countryCode || '' %> <%= t.phone %></div>
+                  </td>
+                  <td>
+                    <span style="font-weight: 600; color: var(--primary-900);">👥 <%= t.people %></span>
+                  </td>
+                  <td>
+                    <% if (t.status === 'Accepted') { %>
+                      <span class="badge badge-active">🟢 Driver Assigned</span>
+                    <% } else if (t.status === 'Cancelled') { %>
+                      <span class="badge badge-inactive">✕ Cancelled</span>
+                    <% } else if (t.status === 'Confirmed') { %>
+                      <span class="badge badge-active">✓ Confirmed</span>
+                    <% } else { %>
+                      <span class="badge badge-pending">🟡 Looking for Driver</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (t.driverId) { %>
+                      <div style="font-weight: 600; color: var(--primary-900);">🚐 <%= t.driverName || 'Assigned Driver' %></div>
+                      <div style="font-size: 0.82rem; color: var(--text-muted);"><%= t.vanModel %> (<%= t.vanNumber %>)</div>
+                      <div style="font-size: 0.82rem; color: var(--text-secondary);">📞 <%= t.driverPhone %></div>
+                    <% } else { %>
+                      <span style="color: var(--text-muted); font-style: italic; font-size: 0.88rem;">None (Open Request)</span>
+                    <% } %>
+                  </td>
+                  <td style="font-size: 0.85rem; color: var(--text-muted);">
+                    <%= bookedDate %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+

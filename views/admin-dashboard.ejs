@@ -1,0 +1,228 @@
+<%- include('partials/head', { title: 'Admin Dashboard' }) %>
+<%- include('partials/navbar', { activePage: 'admin-dashboard' }) %>
+
+<main style="padding: 2.5rem 0 4rem;">
+  <div class="container">
+    <%- include('partials/flash') %>
+
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h1 style="font-size: 1.85rem; color: var(--primary-900); margin: 0;">
+            Platform Overview & Control
+          </h1>
+          <span class="badge" style="background: #e0e7ff; color: #3730a3; font-weight: 700;">ADMIN CONSOLE</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+          Live metrics, driver verification queue, and operational platform monitoring.
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/admin/drivers?status=pending" class="btn btn-primary btn-sm">
+          ⏳ Pending Drivers (<%= stats.pendingDriversCount %>)
+        </a>
+        <a href="/admin/trips" class="btn btn-outline btn-sm">
+          🗺️ Monitor Trips
+        </a>
+        <a href="/admin/users" class="btn btn-outline btn-sm">
+          👥 Platform Users
+        </a>
+      </div>
+    </div>
+
+    <!-- STATS GRID -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 2.5rem;">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value"><%= stats.totalUsers %></div>
+        </div>
+        <div class="stat-icon">👥</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Drivers</div>
+          <div class="stat-value" style="color: var(--primary-600);"><%= stats.totalDrivers %></div>
+        </div>
+        <div class="stat-icon">🚐</div>
+      </div>
+
+      <div class="stat-card" style="<%= stats.pendingDriversCount > 0 ? 'border-color: #f59e0b; background: #fffbeb;' : '' %>">
+        <div>
+          <div class="stat-label">Pending Verification</div>
+          <div class="stat-value" style="color: <%= stats.pendingDriversCount > 0 ? '#b45309' : 'var(--text-main)' %>;">
+            <%= stats.pendingDriversCount %>
+          </div>
+        </div>
+        <div class="stat-icon"><%= stats.pendingDriversCount > 0 ? '⚠️' : '✓' %></div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Active Drivers</div>
+          <div class="stat-value" style="color: var(--teal-600);"><%= stats.activeDriversCount %></div>
+        </div>
+        <div class="stat-icon">🟢</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Trips</div>
+          <div class="stat-value"><%= stats.totalTrips %></div>
+        </div>
+        <div class="stat-icon">🧭</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Accepted Trips</div>
+          <div class="stat-value" style="color: var(--teal-600);"><%= stats.acceptedTripsCount %></div>
+        </div>
+        <div class="stat-icon">🤝</div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Cancelled Trips</div>
+          <div class="stat-value" style="color: var(--danger);"><%= stats.cancelledTripsCount %></div>
+        </div>
+        <div class="stat-icon">✕</div>
+      </div>
+    </div>
+
+    <!-- PENDING DRIVER VERIFICATION QUEUE -->
+    <div class="card" style="margin-bottom: 2.5rem; border-left: 5px solid var(--secondary-500);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.3rem; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>⏳</span> Drivers Awaiting Verification Review
+          </h2>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin: 2px 0 0 0;">
+            Only verified drivers can participate in the marketplace and accept tourist trip requests.
+          </p>
+        </div>
+        <a href="/admin/drivers?status=pending" class="btn btn-outline btn-sm">View All Pending &rarr;</a>
+      </div>
+
+      <% if (pendingDrivers.length === 0) { %>
+        <div style="padding: 1.5rem; text-align: center; color: var(--teal-700); background: var(--teal-50); border-radius: var(--radius-sm);">
+          ✓ Verification queue is clear! All registered drivers have been reviewed.
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Driver Name</th>
+                <th>Email</th>
+                <th>Vehicle / Plate</th>
+                <th>Capacity</th>
+                <th>Submitted</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pendingDrivers.forEach((d) => { %>
+                <% const submittedDate = d.createdAt ? (typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toLocaleDateString() : new Date(d.createdAt).toLocaleDateString()) : 'N/A'; %>
+                <tr>
+                  <td style="font-weight: 700; color: var(--primary-900);"><%= d.name %></td>
+                  <td><%= d.email %></td>
+                  <td><%= d.vanModel %> (<%= d.vanNumber %>)</td>
+                  <td><%= d.seatingCapacity %> seats</td>
+                  <td><%= submittedDate %></td>
+                  <td style="text-align: right;">
+                    <a href="/admin/drivers/<%= d.id %>" class="btn btn-primary btn-sm">Review & Verify &rarr;</a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- TWO COLUMN FEED: RECENT TRIPS & RECENT DRIVERS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 2rem;">
+      <!-- RECENT TRIPS -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🗺️</span> Recent Trip Requests
+          </h3>
+          <a href="/admin/trips" style="font-size: 0.85rem; color: var(--primary-600); text-decoration: none; font-weight: 600;">View all</a>
+        </div>
+
+        <% if (recentTrips.length === 0) { %>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">No trip requests submitted yet.</p>
+        <% } else { %>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <% recentTrips.forEach((t) => { %>
+              <div style="padding: 10px 14px; background: var(--bg-alt); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-900);"><%= t.destination %></div>
+                  <div style="font-size: 0.82rem; color: var(--text-muted);">
+                    <%= t.name %> • <%= t.people %> passenger<%= t.people === 1 ? '' : 's' %> • <%= t.fromDate %> to <%= t.toDate %>
+                  </div>
+                </div>
+                <div>
+                  <% if (t.status === 'Accepted') { %>
+                    <span class="badge badge-active" style="font-size: 0.72rem;">Accepted</span>
+                  <% } else if (t.status === 'Cancelled') { %>
+                    <span class="badge badge-inactive" style="font-size: 0.72rem;">Cancelled</span>
+                  <% } else if (t.status === 'Confirmed') { %>
+                    <span class="badge badge-active" style="font-size: 0.72rem;">Confirmed</span>
+                  <% } else { %>
+                    <span class="badge badge-pending" style="font-size: 0.72rem;">Requested</span>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- RECENT DRIVERS -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h3 style="font-size: 1.15rem; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🚐</span> Recent Driver Registrations
+          </h3>
+          <a href="/admin/drivers" style="font-size: 0.85rem; color: var(--primary-600); text-decoration: none; font-weight: 600;">View all</a>
+        </div>
+
+        <% if (recentDrivers.length === 0) { %>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">No drivers registered yet.</p>
+        <% } else { %>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <% recentDrivers.forEach((d) => { %>
+              <div style="padding: 10px 14px; background: var(--bg-alt); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-900);"><%= d.name %></div>
+                  <div style="font-size: 0.82rem; color: var(--text-muted);">
+                    <%= d.vanModel %> • <%= d.seatingCapacity %> seats • <%= d.email %>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <% if (d.verificationStatus === 'verified') { %>
+                    <span class="badge badge-active" style="font-size: 0.72rem;">✓ Verified</span>
+                  <% } else if (d.verificationStatus === 'rejected') { %>
+                    <span class="badge badge-inactive" style="font-size: 0.72rem;">✕ Rejected</span>
+                  <% } else { %>
+                    <span class="badge badge-pending" style="font-size: 0.72rem;">⏳ Pending</span>
+                  <% } %>
+                  <a href="/admin/drivers/<%= d.id %>" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 0.78rem;">Review</a>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+
